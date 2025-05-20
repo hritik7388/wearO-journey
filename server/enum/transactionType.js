@@ -1,0 +1,7 @@
+module.exports = Object.freeze({
+  PAYMENT: 'PAYMENT',
+  REFUND: 'REFUND',
+  WALLET_TOPUP: 'WALLET_TOPUP',
+  PURCHASE: 'PURCHASE',
+  WITHDRAWAL: 'WITHDRAWAL',
+});
