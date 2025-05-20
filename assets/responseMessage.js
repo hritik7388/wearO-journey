@@ -26,6 +26,7 @@ module.exports = {
   LOGOUT_SUCCESS: "Logged out successfully.",
   MOBILE_ALREADY_IN_USE: "Mobile number already in use.",
   NO_ORDERS_FOUND: "No orders found.",
+  NO_TOKEN:"No token provided.",
   ORDER_CANCELLED: "Order cancelled successfully.",
   ORDER_DETAILS_FETCHED: "Order details fetched successfully.",
   ORDER_EXCHANGED: "Exchange request submitted.",
@@ -59,5 +60,7 @@ module.exports = {
   USER_ALREADY_EXISTS: "User already registered.",
   USER_MANAGEMENT_UPDATED: "User updated successfully.",
   USER_NOT_FOUND: "User not found.",
+  UNAUTHORIZED: "Unauthorized access.",
+  UNEXPECTED_ERROR: "An unexpected error occurred.",
   WISHLIST_FETCHED: "Wishlist fetched successfully."
 };
