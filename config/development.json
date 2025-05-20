@@ -1,7 +1,7 @@
 {
   "port": 2001,
   "hostAddress": "172.16.96:1989",
-  "databaseHost": "127.0.0.1",
+  "databaseHost": "localhost",
   "databasePort": "27017",
   "databaseName": "wearo-journey",
   "jwtsecret": "nodejwt",
@@ -15,7 +15,6 @@
       "version": "2.0",
       "description": "wearo-journey Application API Docs"
     },
- 
     "basePath": "/api/v1",
     "securityDefinitions": {
       "tokenauth": {
@@ -25,19 +24,24 @@
       }
     }
   },
-
-  
-    "twilio": {
-      "accountSid": "accountSid",
-      "authToken": "authToken",
-      "number": "number"
-    },                  
-
-    
- 
+  "twilio": {
+    "accountSid": "accountSid",
+    "authToken": "authToken",
+    "number": "number"
+  },
   "nodemailer": {
     "service": "gmail",
     "email": "email",
     "password": "password"
+  },
+  "cloudinary": {
+    "cloud_name": "your_cloud_name",
+    "api_key": "your_api_key",
+    "api_secret": "your_api_secret"
+  },
+  "razorpay": {
+    "key_id": "your_razorpay_key_id",
+    "key_secret": "your_razorpay_key_secret",
+    "webhookSecret": "your_razorpay_webhook_secret"
   }
 }
