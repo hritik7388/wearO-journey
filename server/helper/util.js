@@ -4,15 +4,15 @@ const fs = require("fs");
 import FCM from "fcm-push";
 import AWS from "aws-sdk";
 import ses from "node-ses";
-import mailTemplet from "../helper/mailtemplet";
+// import mailTemplet from "../helper/mailtemplet";
 const Sender = require('aws-sms-send');
 
 import cloudinary from "cloudinary";
 import nodemailer from "nodemailer";
 
-const accountSid = config.get("twilio.accountSid");
-const authToken = config.get("twilio.authToken");
-const client = require("twilio")(accountSid, authToken);
+// const accountSid = config.get("twilio.accountSid");
+// const authToken = config.get("twilio.authToken");
+// const client = require("twilio")(accountSid, authToken);
 
 // cloudinary.config({
 //   cloud_name: config.get('cloudinary.cloud_name'),
@@ -21,19 +21,19 @@ const client = require("twilio")(accountSid, authToken);
 // });
 
 
-const s3 = new AWS.S3({
-  accessKeyId: config.get("AWS.accessKeyId"),
-  secretAccessKey: config.get("AWS.secretAccessKey"),
-});
+// const s3 = new AWS.S3({
+//   accessKeyId: config.get("AWS.accessKeyId"),
+//   secretAccessKey: config.get("AWS.secretAccessKey"),
+// });
 
-AWS.config.update({
-  accessKeyId: config.get("AWS.accessKeyId"),
-  secretAccessKey: config.get("AWS.secretAccessKey"),
-  region: 'ap-south-1',
-  // region: config.get("AWS.region"),
+// AWS.config.update({
+//   accessKeyId: config.get("AWS.accessKeyId"),
+//   secretAccessKey: config.get("AWS.secretAccessKey"),
+//   region: 'ap-south-1',
+//   // region: config.get("AWS.region"),
 
-});
-const sns = new AWS.SNS();
+// });
+// const sns = new AWS.SNS();
 
 // AWS.config.update({ region:"ap-south-1"});
 // const sns = new AWS.SNS({
@@ -80,7 +80,7 @@ module.exports = {
 
   getToken: async (payload) => {
     var token = await jwt.sign(payload, config.get("jwtsecret"), {
-      expiresIn: "12h",
+      expiresIn: "24h",
     });
     return token;
   },

@@ -45,7 +45,7 @@ class ExpressServer {
         const options = {
             swaggerDefinition,
             apis: [
-                path.resolve(`${root}/server/api/V1/controller/**/*.js`, ),
+                path.resolve(`${root}/server/api/v1/controller/**/*.js`, ),
                 path.resolve(`${root}/api.yaml`),
             ],
 
