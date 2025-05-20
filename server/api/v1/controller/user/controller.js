@@ -9,36 +9,60 @@ import userModel from "../../../../models/userModel";
 import responseMessage from "../../../../../assets/responseMessage";
 export class userController {
 
+/**
+ * @swagger
+ * /user/signUp:
+ *   post:
+ *     tags:
+ *       - USER
+ *     description: SignUp with basic details of the user on the platform for registration
+ *     produces:
+ *       - application/json
+ *     parameters:
+ *       - name: signUp
+ *         description: Sign up request body
+ *         in: body
+ *         required: true
+ *         schema:
+ *           type: object
+ *           properties:
+ *             fullName:
+ *               type: string
+ *             email:
+ *               type: string
+ *             password:
+ *               type: string
+ *             confirmPassword:
+ *               type: string
+ *             countryCode:
+ *               type: string
+ *             mobileNumber:
+ *               type: string
+ *             location:
+ *               type: object
+ *               required:
+ *                 - type
+ *                 - coordinates
+ *               properties:
+ *                 type:
+ *                   type: string
+ *                   enum: [Point]
+ *                   default: Point
+ *                 coordinates:
+ *                   type: array
+ *                   items:
+ *                     type: number
+ *                   minItems: 2
+ *                   maxItems: 2
+ *             deviceToken:
+ *               type: string
+ *             deviceType:
+ *               type: string
+ *     responses:
+ *       200:
+ *         description: OTP sent successfully
+ */
 
-      /**
-   * @swagger
-   * /user/signUp:
-   *   post:
-   *     tags:
-   *       - USER
-   *     description: SignUp with basic details of the user on the platform for registration
-   *     produces:
-   *       - application/json
-   *     parameters:
-   *       - name: signUp
-   *         description: Sign up request body
-   *         in: body
-   *         required: true
-   *         schema:
-   *           type: object
-   *           properties:
-   *             mobileNumber:
-   *               type: string
-   *             countryCode:
-   *               type: string
-   *             deviceToken:
-   *               type: string
-   *             deviceType:
-   *               type: string
-   *     responses:
-   *       200:
-   *         description: OTP sent successfully
-   */
     async signUp(req, res, next) {
         const validationSchema = Joi.object({
             fullName: Joi.string().required(),
