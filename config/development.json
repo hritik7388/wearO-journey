@@ -1,0 +1,43 @@
+{
+  "port": 2001,
+  "hostAddress": "172.16.96:1989",
+  "databaseHost": "127.0.0.1",
+  "databasePort": "27017",
+  "databaseName": "wearo-journey",
+  "jwtsecret": "nodejwt",
+  "jwtresetsecret": "nodejwt",
+  "jwtOptions": {
+    "expiresIn": "24h"
+  },
+  "swaggerDefinition": {
+    "info": {
+      "title": "wearo-journey Application",
+      "version": "2.0",
+      "description": "wearo-journey Application API Docs"
+    },
+ 
+    "basePath": "/api/v1",
+    "securityDefinitions": {
+      "tokenauth": {
+        "type": "apiKey",
+        "name": "Authorization",
+        "in": "header"
+      }
+    }
+  },
+
+  
+    "twilio": {
+      "accountSid": "accountSid",
+      "authToken": "authToken",
+      "number": "number"
+    },                  
+
+    
+ 
+  "nodemailer": {
+    "service": "gmail",
+    "email": "email",
+    "password": "password"
+  }
+}
