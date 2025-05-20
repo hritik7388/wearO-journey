@@ -79,8 +79,7 @@ module.exports = Mongoose.model("user", userModel);
             console.log("Default Admin 😀 .");
         } else {
             const createdRes = await Mongoose.model("user", userModel).create({
-                firstName: "Hritik",
-                lastName: "Bhadauria",
+                 
                 fullName: "Hritik Bhadauria",
                 email: "choreohritik52@gmail.com",
                 mobileNumber: "7388503329",

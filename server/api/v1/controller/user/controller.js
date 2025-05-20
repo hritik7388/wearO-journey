@@ -7,61 +7,63 @@ import commonFunction from "../../../../helper/util";
 import response from "../../../../../assets/response";
 import userModel from "../../../../models/userModel";
 import responseMessage from "../../../../../assets/responseMessage";
-export class userController { 
+export class userController {
 
 
- 
-  async signUp(req, res, next) {
+      /**
+   * @swagger
+   * /user/signUp:
+   *   post:
+   *     tags:
+   *       - USER
+   *     description: SignUp with basic details of the user on the platform for registration
+   *     produces:
+   *       - application/json
+   *     parameters:
+   *       - name: signUp
+   *         description: Sign up request body
+   *         in: body
+   *         required: true
+   *         schema:
+   *           type: object
+   *           properties:
+   *             mobileNumber:
+   *               type: string
+   *             countryCode:
+   *               type: string
+   *             deviceToken:
+   *               type: string
+   *             deviceType:
+   *               type: string
+   *     responses:
+   *       200:
+   *         description: OTP sent successfully
+   */
+    async signUp(req, res, next) {
         const validationSchema = Joi.object({
-            firstName: Joi.string().required(),
-            lastName: Joi.string().required(),
+            fullName: Joi.string().required(),
+            email: Joi.string().email().required(),
+            countryCode: Joi.string().optional(),
+            mobileNumber: Joi.string().required(),
             password: Joi.string().required(),
             confirmPassword: Joi.string().required(),
-            userName: Joi.string().required(),
-            mobileNumber: Joi.string().required(),
-            email: Joi.string().email().required(),
-            dateOfBirth: Joi.string().required(), // string as per schema
-            gender: Joi.string().valid("male", "female", "other", "prefer_not_to_say").required(),
-            address: Joi.string().required(),
             location: Joi.object({
                 type: Joi.string().valid("Point").default("Point"),
                 coordinates: Joi.array().items(Joi.number()).length(2).required(),
             }).required(),
-            profilePic: Joi.string().optional(),
-            coverImage: Joi.string().optional(),
-            countryCode: Joi.string().optional(),
-            state: Joi.string().optional(),
-            streetName: Joi.string().optional(),
-            buildingName: Joi.string().optional(),
-            city: Joi.string().optional(),
-            zipCode: Joi.string().optional(),
-            country: Joi.string().optional(),
             deviceToken: Joi.string().optional(),
             deviceType: Joi.string().optional(),
         });
         try {
             var validatedBody = await Joi.validate(req.body, validationSchema);
             const {
-                firstName,
-                lastName,
+                fullName,
                 email,
                 password,
                 confirmPassword,
-                userName,
-                mobileNumber,
-                dateOfBirth,
-                gender,
-                address,
-                location,
-                profilePic,
-                coverImage,
                 countryCode,
-                state,
-                streetName,
-                buildingName,
-                city,
-                zipCode,
-                country,
+                mobileNumber,
+                location,
                 deviceToken,
                 deviceType,
             } = validatedBody;
@@ -108,29 +110,16 @@ export class userController {
             validatedBody.OTP = commonFunction.getOTP();
             validatedBody.otpExpTime = new Date().getTime() + 180000; // 3 minutes expiry
             const usersInfo = {
-                firstName: validatedBody.firstName,
-                lastName: validatedBody.lastName,
-                userName: validatedBody.userName,
+                fullName: validatedBody.firstName,
                 email: validatedBody.email,
                 mobileNumber: validatedBody.mobileNumber,
-                dateOfBirth: validatedBody.dateOfBirth,
-                address: validatedBody.address,
                 password: hashPassword,
                 otp: validatedBody.otp,
                 otpExpTime: validatedBody.otpExpTime,
                 location: validatedBody.location,
-                gender: validatedBody.gender,
-                coverImage: validatedBody.coverImage ,
-                profilePic: validatedBody.profilePic  ,
-                countryCode: validatedBody.countryCode  ,
-                state: validatedBody.state  ,
-                streetName: validatedBody.streetName  ,
-                buildingName: validatedBody.buildingName  ,
-                city: validatedBody.city ,
-                zipCode: validatedBody.zipCode  ,
-                country: validatedBody.country  ,
-                deviceToken: validatedBody.deviceToken ,
-                deviceType: validatedBody.deviceType  ,
+                countryCode: validatedBody.countryCode,
+                deviceToken: validatedBody.deviceToken,
+                deviceType: validatedBody.deviceType,
             };
 
             const newUser = await userModel.create(usersInfo);
