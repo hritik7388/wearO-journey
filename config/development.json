@@ -35,9 +35,9 @@
     "password": "password"
   },
   "cloudinary": {
-    "cloud_name": "your_cloud_name",
-    "api_key": "your_api_key",
-    "api_secret": "your_api_secret"
+    "cloud_name": "djghn6egw",
+    "api_key": "213418396192689",
+    "api_secret": "JhviaKFUIQEh9ds1p3MvEwMEB0M"
   },
   "razorpay": {
     "key_id": "your_razorpay_key_id",

@@ -1,63 +1,61 @@
 import config from "config";
 import jwt from "jsonwebtoken";
-import userModel from "../models/user";
+import userModel from "../models/userModel";
 import apiError from './apiError';
 import responseMessage from '../../assets/responseMessage';
 module.exports = {
 
-  verifyToken(req, res, next) {
-    if (req.headers.token) {
-      jwt.verify(req.headers.token, config.get('jwtsecret'), (err, result) => {
-        if (err) {
-          if (err.name == "TokenExpiredError") {
-            return res.status(440).send({
-              responseCode: 440,
-              responseMessage: "Session Expired, Please login again.",
-            });
-          }
-          else {
-            throw apiError.unauthorized(responseMessage.UNAUTHORIZED);
-          }
-        }
-        else {
-          userModel.findOne({ _id: result._id }, (error, result2) => {
-            if (error) {
-              return next(error)
-            }
-            else if (!result2) {
-              console.log(result2);
-              //throw apiError.notFound(responseMessage.USER_NOT_FOUND);
-              return res.status(404).json({
-                responseCode: 404,
-                responseMessage: "USER NOT FOUND"
-              })
-            }
-            else {
-              if (result2.status == "BLOCKED") {
-                return res.status(403).json({
-                  responseCode: 403,
-                  responseMessage: "You have been blocked by admin ."
-                })
-              }
-              else if (result2.status == "DELETE") {
-                return res.status(402).json({
-                  responseCode: 402,
-                  responseMessage: "Your account has been deleted by admin ."
-                })
-              }
-              else {
-                req.userId = result._id;
-                req.userDetails = result
-                next();
-              }
-            }
-          })
-        }
-      })
-    } else {
+async verifyToken(req, res, next) {
+  try {
+    const token = req.headers.token;
+    if (!token) {
       throw apiError.invalid(responseMessage.NO_TOKEN);
     }
-  },
+
+    const decoded = jwt.verify(token, config.get('jwtsecret'));
+    const user = await userModel.findOne({ _id: decoded._id });
+
+    if (!user) {
+      return res.status(404).json({
+        responseCode: 404,
+        responseMessage: "USER NOT FOUND",
+      });
+    }
+
+    if (user.status === "BLOCKED") {
+      return res.status(403).json({
+        responseCode: 403,
+        responseMessage: "You have been blocked by admin.",
+      });
+    }
+
+    if (user.status === "DELETE") {
+      return res.status(402).json({
+        responseCode: 402,
+        responseMessage: "Your account has been deleted by admin.",
+      });
+    }
+
+    req.userId = user._id;
+    req.userDetails = user;
+    next();
+
+  } catch (err) {
+    if (err.name === "TokenExpiredError") {
+      return res.status(440).send({
+        responseCode: 440,
+        responseMessage: "Session Expired, Please login again.",
+      });
+    } else if (err.name === "JsonWebTokenError") {
+      return res.status(401).json({
+        responseCode: 401,
+        responseMessage: "Invalid Token",
+      });
+    } else {
+      return next(err);
+    }
+  }
+},
 
   // async verifyToken(req, res, next) {
   //   try {

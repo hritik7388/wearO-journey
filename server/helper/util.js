@@ -82,6 +82,7 @@ module.exports = {
     var token = await jwt.sign(payload, config.get("jwtsecret"), {
       expiresIn: "24h",
     });
+    console.log("getToken==================>>>>", token);
     return token;
   },
 

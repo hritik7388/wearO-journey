@@ -19,8 +19,7 @@ const userModel = new Schema(
         lastName: {type: String},
         email: {type: String},
         profilePic: {type: String, default: ""},
-        coverImage: {type: String, default: ""},
-        coverPic: {type: String},
+        coverImage: {type: String, default: ""}, 
 
         gender: {
             type: String,

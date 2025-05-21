@@ -37,6 +37,8 @@ module.exports = {
   ORDER_TRACKING_FETCHED: "Tracking details fetched successfully.",
   OTP_SENT: "OTP sent successfully.",
   OTP_VERIFIED: "OTP verified successfully.",
+  OTP_EXPIRED: "OTP expired.",
+  PASSWORD_CHANGED: "Password changed successfully.",
   PASSWORD_NOT_MATCH: "Password does not match.",
   PASSWORD_RESET_SUCCESS: "Password reset successfully.",
   PASSWORD_UPDATED: "Password updated successfully.",
@@ -66,5 +68,8 @@ module.exports = {
   USER_NOT_FOUND: "User not found.",
   UNAUTHORIZED: "Unauthorized access.",
   UNEXPECTED_ERROR: "An unexpected error occurred.",
+  USER_LIST: "User list fetched successfully.",
+  USER_PROFILE_UPDATED: "User profile updated successfully.",
+  USER_VERIFIED: "User verified successfully.",
   WISHLIST_FETCHED: "Wishlist fetched successfully."
 };
