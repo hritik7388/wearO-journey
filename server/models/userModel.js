@@ -1,4 +1,3 @@
-import config from "config";
 import bcrypt from "bcryptjs";
 import gender from "../enum/gender";
 import status from "../enum/status";
