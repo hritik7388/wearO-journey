@@ -16,3 +16,7 @@ export default Express.Router()
 .post('/resetPassword',controller.resetPassword) 
 .patch('/changePassword',controller.changePassword)
 .get('/userProfile',controller.userProfile)
+
+  .get("/viewUser", controller.viewUser)
+  .delete("/deleteUser", controller.deleteUser)
+

@@ -29,6 +29,53 @@ const {
 export class adminController {
     /**
      * @swagger
+     * /admin/dashboard:
+     *   get:
+     *     summary: dashboard
+     *     tags:
+     *       - ADMIN
+     *     description: dashboard section for all counts of USER,PENDING_KYC,APPROVE_KYC,ACTIVE_USER,BLOCK_USER,TOTAL Counts
+     *     produces:
+     *       - application/json
+     *     parameters:
+     *       - name: token
+     *         description: token
+     *         in: header
+     *         required: true
+     *     responses:
+     *       200:
+     *         description: Returns success message
+     */
+    async dashboard(req, res, next) {
+        try {
+            let admin = await findUser({
+                _id: req.userId,
+                status: {$ne: status.DELETE},
+                // userType: userType.ADMIN,
+            });
+            if (!admin) {
+                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+            }
+            let [activeUser, allSuccessTransaction] = await Promise.all([
+                allactiveUser({status: status.ACTIVE, userType: userType.USER}),
+                alltransactionCount({transStatusType: transactionStatusType.SUCCESS}),
+            ]);
+            let obj = {
+                activeUser: activeUser,
+                allSuccessTransaction: allSuccessTransaction,
+                earningAmount: totalEarning,
+                totalUserBal: totalUserBal,
+                totalAdminBal: 0,
+            };
+            return res.json(new response(obj, responseMessage.DATA_FOUND));
+        } catch (error) {
+            console.log("error===>>>", error);
+            return next(error);
+        }
+    }
+
+    /**
+     * @swagger
      * /admin/login:
      *   post:
      *     tags:
@@ -452,298 +499,549 @@ export class adminController {
             return next(error);
         }
     }
- 
-/**
- * @swagger
- * /admin/forgotPassword:
- *   post:
- *     tags:
- *       - ADMIN
- *     description: Admin initiates the forgot password process
- *     produces:
- *       - application/json
- *     parameters:
- *       - name: body
- *         description: Forgot password details
- *         in: body
- *         required: true
- *         schema:
- *           type: object
- *           properties:
- *             email:
- *               type: string
- *               description: Admin's email address
- *     responses:
- *       200:
- *         description: Returns success message after initiating the forgot password process 
- */
-  async forgotPassword(req, res, next) {
-    var validationSchema = {
-      email: Joi.string().required(),
-    };
-    try {
-      if (req.body.email) {
-        req.body.email = req.body.email.toLowerCase();
-      }
-      var validatedBody = await Joi.validate(req.body, validationSchema);
-      const { email } = validatedBody;
-      var userResult = await userModel.findOne({
-        email: email,
-        status: { $ne: status.DELETE },
-        userType: userType.ADMIN,
-      });
-      if (!userResult) {
-        throw apiError.notFound(responseMessage.USER_NOT_FOUND);
-      } else {
-        var otp = commonFunction.getOTP();
-        var newOtp = otp;
-        var time = Date.now() + 180000;
-      //  await commonFunction.sendMailOtpForgetAndResend(email, otp);
-        var updateResult = await userModel.findByIdAndUpdate(
-          { _id: userResult._id },
-          { $set: { otp: newOtp, otpExpTime: time,otpVerification:false } } , {new: true}
-        );
-        return res.json(new response(updateResult,responseMessage.OTP_SENT));
-      }
-    } catch (error) {
-      console.log(error);
-      return next(error);
-    }
-  }
 
     /**
-   * @swagger
-   * /admin/resetPassword:
-   *   post:
-   *     tags:
-   *       - ADMIN
-   *     description: Change password or reset password When ADMIN need to chnage
-   *     produces:
-   *       - application/json
-   *     parameters:
-   *       - name: token
-   *         description: token
-   *         in: header
-   *         required: true
-   *       - name: password
-   *         description: password
-   *         in: formData
-   *         required: true
-   *       - name: confirmPassword
-   *         description: confirmPassword
-   *         in: formData
-   *         required: true
-   *     responses:
-   *       200:
-   *         description: Your password has been successfully changed.
-   *       404:
-   *         description: This user does not exist.
-   *       422:
-   *         description: Password not matched.
-   *       500:
-   *         description: Internal Server Error
-   *       501:
-   *         description: Something went wrong!
-   */
-  async resetPassword(req, res, next) {
-    const validationSchema = {
-      password: Joi.string().required(),
-      confirmPassword: Joi.string().required(),
-    };
-    try {
-      const { password, confirmPassword } = await Joi.validate(
-        req.body,
-        validationSchema
-      );
-      var userResult = await userModel.findOne({
-        _id: req.userId,
-        status: { $ne: status.DELETE },
-        userType: userType.ADMIN,
-      });
-      if (!userResult) {
-        throw apiError.notFound(responseMessage.USER_NOT_FOUND);
-      } else {
-        if (password == confirmPassword) {
-          let update = await userModel.findByIdAndUpdate(
-            { _id: userResult._id },
-            { password: bcrypt.hashSync(password) },{new: true}
-          );
-          return res.json(new response(update, responseMessage.PASSWORD_RESET_SUCCESS));
-        } else {
-          throw apiError.notFound(responseMessage.PASSWORD_NOT_MATCH);
+     * @swagger
+     * /admin/forgotPassword:
+     *   post:
+     *     tags:
+     *       - ADMIN
+     *     description: Admin initiates the forgot password process
+     *     produces:
+     *       - application/json
+     *     parameters:
+     *       - name: body
+     *         description: Forgot password details
+     *         in: body
+     *         required: true
+     *         schema:
+     *           type: object
+     *           properties:
+     *             email:
+     *               type: string
+     *               description: Admin's email address
+     *     responses:
+     *       200:
+     *         description: Returns success message after initiating the forgot password process
+     */
+    async forgotPassword(req, res, next) {
+        var validationSchema = {
+            email: Joi.string().required(),
+        };
+        try {
+            if (req.body.email) {
+                req.body.email = req.body.email.toLowerCase();
+            }
+            var validatedBody = await Joi.validate(req.body, validationSchema);
+            const {email} = validatedBody;
+            var userResult = await userModel.findOne({
+                email: email,
+                status: {$ne: status.DELETE},
+                userType: userType.ADMIN,
+            });
+            if (!userResult) {
+                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+            } else {
+                var otp = commonFunction.getOTP();
+                var newOtp = otp;
+                var time = Date.now() + 180000;
+                //  await commonFunction.sendMailOtpForgetAndResend(email, otp);
+                var updateResult = await userModel.findByIdAndUpdate(
+                    {_id: userResult._id},
+                    {$set: {otp: newOtp, otpExpTime: time, otpVerification: false}},
+                    {new: true}
+                );
+                return res.json(new response(updateResult, responseMessage.OTP_SENT));
+            }
+        } catch (error) {
+            console.log(error);
+            return next(error);
         }
-      }
-    } catch (error) {
-      console.log(error);
-      return next(error);
     }
-  }
 
-  /**
-   * @swagger
-   * /admin/resendOTP:
-   *   post:
-   *     tags:
-   *       - ADMIN
-   *     description: after OTP expire or not get any OTP with that frameOfTime ADMIN resendOTP for new OTP
-   *     produces:
-   *       - application/json
-   *     parameters:
- *       - name: body
- *         description: Forgot password details
- *         in: body
- *         required: true
- *         schema:
- *           type: object
- *           properties:
- *             email:
- *               type: string
- *               description: Admin's email address
-   *     responses:
-   *       200:
-   *         description: Returns success message
-   */
-  async resendOTP(req, res, next) {
-    var validationSchema = {
-      email: Joi.string().required(),
-    };
-    try {
-      if (req.body.field) {
-        req.body.field = req.body.field.toLowerCase();
-      }
-      var validatedBody = await Joi.validate(req.body, validationSchema);
-      const { email } = validatedBody;
-      var userResult = await userModel.findOne({
-        email: validatedBody.email,
-        status: { $ne: status.DELETE },
-        userType: userType.ADMIN,
-      });
-      if (!userResult) {
-        throw apiError.notFound(responseMessage.USER_NOT_FOUND);
-      }
-      var otp = commonFunction.getOTP();
-      var otpTime = new Date().getTime() + 180000;
-    //   await commonFunction.sendMailOtpForgetAndResend(
-    //     "info@rival.finance",
-    //     otp
-    //   );
-      // await commonFunction.sendMailOtpForgetAndResend(email, otp);
-      var updateResult = await userModel.findByIdAndUpdate(
-        { _id: userResult._id },
-        { otp: otp, otpTime: otpTime },{new: true}
-      );
-      return res.json(new response(updateResult, responseMessage.OTP_SEND));
-    } catch (error) {
-      console.log(error);
-      return next(error);
+    /**
+     * @swagger
+     * /admin/resetPassword:
+     *   post:
+     *     tags:
+     *       - ADMIN
+     *     description: Change password or reset password When ADMIN need to chnage
+     *     produces:
+     *       - application/json
+     *     parameters:
+     *       - name: token
+     *         description: token
+     *         in: header
+     *         required: true
+     *       - name: password
+     *         description: password
+     *         in: formData
+     *         required: true
+     *       - name: confirmPassword
+     *         description: confirmPassword
+     *         in: formData
+     *         required: true
+     *     responses:
+     *       200:
+     *         description: Your password has been successfully changed.
+     *       404:
+     *         description: This user does not exist.
+     *       422:
+     *         description: Password not matched.
+     *       500:
+     *         description: Internal Server Error
+     *       501:
+     *         description: Something went wrong!
+     */
+    async resetPassword(req, res, next) {
+        const validationSchema = {
+            password: Joi.string().required(),
+            confirmPassword: Joi.string().required(),
+        };
+        try {
+            const {password, confirmPassword} = await Joi.validate(req.body, validationSchema);
+            var userResult = await userModel.findOne({
+                _id: req.userId,
+                status: {$ne: status.DELETE},
+                userType: userType.ADMIN,
+            });
+            if (!userResult) {
+                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+            } else {
+                if (password == confirmPassword) {
+                    let update = await userModel.findByIdAndUpdate(
+                        {_id: userResult._id},
+                        {password: bcrypt.hashSync(password)},
+                        {new: true}
+                    );
+                    return res.json(new response(update, responseMessage.PASSWORD_RESET_SUCCESS));
+                } else {
+                    throw apiError.notFound(responseMessage.PASSWORD_NOT_MATCH);
+                }
+            }
+        } catch (error) {
+            console.log(error);
+            return next(error);
+        }
     }
-  }
 
-/**
- * @swagger
- * /admin/changePassword:
- *   patch:
- *     tags:
- *       - ADMIN
- *     summary: Change password by ADMIN
- *     description: Allows an ADMIN to change their password on the platform.
- *     consumes:
- *       - application/json
- *     produces:
- *       - application/json
- *     parameters:
- *       - in: header
- *         name: token
- *         type: string
- *         required: true
- *         description: Authorization token
- *       - in: body
- *         name: body
- *         required: true
- *         description: Admin password change details
- *         schema:
- *           type: object
- *           required:
- *             - oldPassword
- *             - newPassword
- *           properties:
- *             oldPassword:
- *               type: string
- *             newPassword:
- *               type: string
- *     responses:
- *       200:
- *         description: Password changed successfully
- *       400:
- *         description: Invalid request or validation error
- *       401:
- *         description: Unauthorized or token missing/invalid
- *       500:
- *         description: Internal server error
- */
-  async changePassword(req, res, next) {
-    const validationSchema = {
-      oldPassword: Joi.string().required(),
-      newPassword: Joi.string().required(),
-    };
-    try {
-      let validatedBody = await Joi.validate(req.body, validationSchema);
-      let userResult = await userModel.findOne({
-        _id: req.userId,
-        status: { $ne: status.DELETE },
-        userType: userType.ADMIN,
-      });
-      if (!userResult) {
-        throw apiError.notFound(responseMessage.USER_NOT_FOUND);
-      }
-      if (!bcrypt.compareSync(validatedBody.oldPassword, userResult.password)) {
-        throw apiError.badRequest(responseMessage.PWD_NOT_MATCH);
-      }
-      let updated = await userModel.findByIdAndUpdate(userResult._id, {
-        password: bcrypt.hashSync(validatedBody.newPassword),
-      },{new:true});
-      return res.json(new response(updated, responseMessage.PWD_CHANGED));
-    } catch (error) {
-      return next(error);
+    /**
+     * @swagger
+     * /admin/resendOTP:
+     *   post:
+     *     tags:
+     *       - ADMIN
+     *     description: after OTP expire or not get any OTP with that frameOfTime ADMIN resendOTP for new OTP
+     *     produces:
+     *       - application/json
+     *     parameters:
+     *       - name: body
+     *         description: Forgot password details
+     *         in: body
+     *         required: true
+     *         schema:
+     *           type: object
+     *           properties:
+     *             email:
+     *               type: string
+     *               description: Admin's email address
+     *     responses:
+     *       200:
+     *         description: Returns success message
+     */
+    async resendOTP(req, res, next) {
+        var validationSchema = {
+            email: Joi.string().required(),
+        };
+        try {
+            if (req.body.field) {
+                req.body.field = req.body.field.toLowerCase();
+            }
+            var validatedBody = await Joi.validate(req.body, validationSchema);
+            const {email} = validatedBody;
+            var userResult = await userModel.findOne({
+                email: validatedBody.email,
+                status: {$ne: status.DELETE},
+                userType: userType.ADMIN,
+            });
+            if (!userResult) {
+                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+            }
+            var otp = commonFunction.getOTP();
+            var otpTime = new Date().getTime() + 180000;
+            //   await commonFunction.sendMailOtpForgetAndResend(
+            //     "info@rival.finance",
+            //     otp
+            //   );
+            // await commonFunction.sendMailOtpForgetAndResend(email, otp);
+            var updateResult = await userModel.findByIdAndUpdate(
+                {_id: userResult._id},
+                {otp: otp, otpTime: otpTime},
+                {new: true}
+            );
+            return res.json(new response(updateResult, responseMessage.OTP_SEND));
+        } catch (error) {
+            console.log(error);
+            return next(error);
+        }
     }
-  }
 
-  /**
-   * @swagger
-   * /admin/adminProfile:
-   *   get:
-   *     tags:
-   *       - ADMIN
-   *     description: get his own profile details with adminProfile API
-   *     produces:
-   *       - application/json
-   *     parameters:
-   *       - name: token
-   *         description: token
-   *         in: header
-   *         required: true
-   *     responses:
-   *       200:
-   *         description: Returns success message
-   */
-  async adminProfile(req, res, next) {
-    try {
-      let adminResult = await userModel.findOne({
-        _id: req.userId,
-        status: { $ne: status.DELETE },
-        userType: userType.ADMIN,
-      });
-      if (!adminResult) {
-        throw apiError.notFound(responseMessage.USER_NOT_FOUND);
-      }
-     
-
-      return res.json(new response(adminResult, responseMessage.USER_DETAILS));
-    } catch (error) {
-        console.log("==================================>",error);
-      return next(error);
+    /**
+     * @swagger
+     * /admin/changePassword:
+     *   patch:
+     *     tags:
+     *       - ADMIN
+     *     summary: Change password by ADMIN
+     *     description: Allows an ADMIN to change their password on the platform.
+     *     consumes:
+     *       - application/json
+     *     produces:
+     *       - application/json
+     *     parameters:
+     *       - in: header
+     *         name: token
+     *         type: string
+     *         required: true
+     *         description: Authorization token
+     *       - in: body
+     *         name: body
+     *         required: true
+     *         description: Admin password change details
+     *         schema:
+     *           type: object
+     *           required:
+     *             - oldPassword
+     *             - newPassword
+     *           properties:
+     *             oldPassword:
+     *               type: string
+     *             newPassword:
+     *               type: string
+     *     responses:
+     *       200:
+     *         description: Password changed successfully
+     *       400:
+     *         description: Invalid request or validation error
+     *       401:
+     *         description: Unauthorized or token missing/invalid
+     *       500:
+     *         description: Internal server error
+     */
+    async changePassword(req, res, next) {
+        const validationSchema = {
+            oldPassword: Joi.string().required(),
+            newPassword: Joi.string().required(),
+        };
+        try {
+            let validatedBody = await Joi.validate(req.body, validationSchema);
+            let userResult = await userModel.findOne({
+                _id: req.userId,
+                status: {$ne: status.DELETE},
+                userType: userType.ADMIN,
+            });
+            if (!userResult) {
+                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+            }
+            if (!bcrypt.compareSync(validatedBody.oldPassword, userResult.password)) {
+                throw apiError.badRequest(responseMessage.PWD_NOT_MATCH);
+            }
+            let updated = await userModel.findByIdAndUpdate(
+                userResult._id,
+                {
+                    password: bcrypt.hashSync(validatedBody.newPassword),
+                },
+                {new: true}
+            );
+            return res.json(new response(updated, responseMessage.PWD_CHANGED));
+        } catch (error) {
+            return next(error);
+        }
     }
-  }
+
+    /**
+     * @swagger
+     * /admin/adminProfile:
+     *   get:
+     *     tags:
+     *       - ADMIN
+     *     description: get his own profile details with adminProfile API
+     *     produces:
+     *       - application/json
+     *     parameters:
+     *       - name: token
+     *         description: token
+     *         in: header
+     *         required: true
+     *     responses:
+     *       200:
+     *         description: Returns success message
+     */
+    async adminProfile(req, res, next) {
+        try {
+            let adminResult = await userModel.findOne({
+                _id: req.userId,
+                status: {$ne: status.DELETE},
+                userType: userType.ADMIN,
+            });
+            if (!adminResult) {
+                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+            }
+
+            return res.json(new response(adminResult, responseMessage.USER_DETAILS));
+        } catch (error) {
+            console.log("==================================>", error);
+            return next(error);
+        }
+    }
+
+    /**
+     * @swagger
+     * /admin/viewUser:
+     *   get:
+     *     tags:
+     *       - ADMIN_USER_MANAGEMENT
+     *     description: view basic Details of any USER with _id
+     *     produces:
+     *       - application/json
+     *     parameters:
+     *       - name: token
+     *         description: token
+     *         in: header
+     *         required: true
+     *       - name: _id
+     *         description: _id
+     *         in: query
+     *         required: false
+     *     responses:
+     *       200:
+     *         description: Returns success message
+     */
+    async viewUser(req, res, next) {
+        const validationSchema = {
+            _id: Joi.string().required(),
+        };
+        try {
+            const validatedBody = await Joi.validate(req.query, validationSchema);
+            let userResult = await findUser({
+                _id: req.userId,
+                status: {$ne: status.DELETE},
+                userType: userType.ADMIN,
+            });
+            if (!userResult) {
+                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+            }
+            var userInfo = await findUser({
+                _id: validatedBody._id,
+                status: {$ne: status.DELETE},
+            });
+            console.log("userInfo==>>>>", userInfo);
+            if (!userInfo) {
+                throw apiError.notFound(responseMessage.DATA_NOT_FOUND);
+            }
+            return res.json(new response(userInfo, responseMessage.DATA_FOUND));
+        } catch (error) {
+            console.log("btcBal.balance==>>", error);
+            return next(error);
+        }
+    }
+
+    /**
+     * @swagger
+     * /admin/deleteUser:
+     *   delete:
+     *     tags:
+     *       - ADMIN_USER_MANAGEMENT
+     *     description: deleteUser When Admin want to delete Any USER from plateform
+     *     produces:
+     *       - application/json
+     *     parameters:
+     *       - name: token
+     *         description: token
+     *         in: header
+     *         required: true
+     *       - name: _id
+     *         description: _id
+     *         in: query
+     *         required: false
+     *     responses:
+     *       200:
+     *         description: Returns success message
+     */
+    async deleteUser(req, res, next) {
+        const validationSchema = {
+            _id: Joi.string().required(),
+        };
+        try {
+            const validatedBody = await Joi.validate(req.query, validationSchema);
+            var {_id} = validatedBody;
+            console.log("validatedBody==>>", validatedBody);
+
+            let userResult = await findUser({
+                _id: req.userId,
+                status: {$ne: status.DELETE},
+                userType: userType.ADMIN,
+            });
+            if (!userResult) {
+                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+            }
+            var userInfo = await findUser({
+                _id: validatedBody._id,
+                userType: userType.USER,
+                status: {$ne: status.DELETE},
+            });
+            if (!userInfo) {
+                throw apiError.notFound(responseMessage.DATA_NOT_FOUND);
+            }
+            let deleteRes = await userModel.findByIdAndUpdate(
+                {_id: userInfo._id},
+                {$set: {status: status.DELETE}},
+                {new: true}
+            );
+            console.log("deleteRes================>", deleteRes);
+            return res.json(new response(deleteRes, responseMessage.DELETE_SUCCESS));
+        } catch (error) {
+            console.log("error============>>", error);
+            return next(error);
+        }
+    }
+
+    /**
+     * @swagger
+     * /admin/blockUnblockUser:
+     *   put:
+     *     tags:
+     *       - ADMIN_USER_MANAGEMENT
+     *     description: blockUnblockUser When ADMIN want to block User or Unblock USER on Plateform
+     *     produces:
+     *       - application/json
+     *     parameters:
+     *       - name: token
+     *         description: token
+     *         in: header
+     *         required: true
+     *       - name: _id
+     *         description: _id
+     *         in: query
+     *         required: false
+     *     responses:
+     *       200:
+     *         description: Returns success message
+     */
+    async blockUnblockUser(req, res, next) {
+        const validationSchema = {
+            _id: Joi.string().required(),
+        };
+        try {
+            const validatedBody = await Joi.validate(req.query, validationSchema);
+            let userResult = await findUser({
+                _id: req.userId,
+                status: {$ne: status.DELETE},
+                userType: userType.ADMIN,
+            });
+            if (!userResult) {
+                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+            }
+            var userInfo = await findUser({
+                _id: validatedBody._id,
+                userType: {$ne: "ADMIN"},
+                //status: { $ne: status.DELETE },
+            });
+            if (!userInfo) {
+                throw apiError.notFound(responseMessage.DATA_NOT_FOUND);
+            }
+            if (userInfo.status == status.ACTIVE) {
+                let blockRes = await updateUser({_id: userInfo._id}, {status: status.BLOCK});
+                return res.json(new response(blockRes, responseMessage.BLOCK_BY_ADMIN));
+            } else {
+                let activeRes = await updateUser({_id: userInfo._id}, {status: status.ACTIVE});
+                return res.json(new response(activeRes, responseMessage.UNBLOCK_BY_ADMIN));
+            }
+        } catch (error) {
+            return next(error);
+        }
+    }
+
+    /**
+     * @swagger
+     * /admin/listUser:
+     *   get:
+     *     tags:
+     *       - ADMIN_USER_MANAGEMENT
+     *     description: List of all USER on plateform by ADMIN Call this listuser API
+     *     produces:
+     *       - application/json
+     *     parameters:
+     *       - name: token
+     *         description: token
+     *         in: header
+     *         required: true
+     *       - name: status1
+     *         description: status1
+     *         in: query
+     *         required: false
+     *       - name: search
+     *         description: search
+     *         in: query
+     *         required: false
+     *       - name: fromDate
+     *         description: fromDate
+     *         in: query
+     *         required: false
+     *       - name: toDate
+     *         description: toDate
+     *         in: query
+     *         required: false
+     *       - name: kycStatus
+     *         description: kycStatus is PENDING || REJECT ||APPROVE || NOT_APPLIED
+     *         in: query
+     *         required: false
+     *       - name: page
+     *         description: page
+     *         in: query
+     *         type: integer
+     *         required: false
+     *       - name: limit
+     *         description: limit
+     *         in: query
+     *         type: integer
+     *         required: false
+     *     responses:
+     *       200:
+     *         description: Returns success message
+     */
+    async listUser(req, res, next) {
+        const validationSchema = {
+            status1: Joi.string().allow("").optional(),
+            search: Joi.string().allow("").optional(),
+            fromDate: Joi.string().allow("").optional(),
+            toDate: Joi.string().allow("").optional(),
+            page: Joi.number().allow("").optional(),
+            limit: Joi.number().allow("").optional(),
+            kycStatus: Joi.string().allow("").optional(),
+        };
+        try {
+            const validatedBody = await Joi.validate(req.query, validationSchema);
+            let userResult = await findUser({
+                _id: req.userId,
+                status: {$ne: status.DELETE},
+                userType: userType.ADMIN,
+            });
+            if (!userResult) {
+                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+            }
+
+            let dataResults = await paginateSearch(validatedBody);
+            if (dataResults.docs.length == 0) {
+                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+            }
+            return res.json(new response(dataResults, responseMessage.DATA_FOUND));
+            console.log();
+        } catch (error) {
+            console.log("error===>>>>", error);
+            return next(error);
+        }
+    }
 }
 export default new adminController();
 //work on progress
