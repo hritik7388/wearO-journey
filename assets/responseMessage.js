@@ -61,6 +61,7 @@ module.exports = {
   SOCIAL_LOGIN_SUCCESS: "Social login successful.",
   SUBCATEGORY_LIST: "Subcategories fetched successfully.",
   USER_ALREADY_EXISTS: "User already registered.",
+  USER_REGISTERED: "User registered successfully.",
   USER_MANAGEMENT_UPDATED: "User updated successfully.",
   USER_NOT_FOUND: "User not found.",
   UNAUTHORIZED: "Unauthorized access.",

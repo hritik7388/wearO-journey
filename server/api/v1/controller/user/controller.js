@@ -106,7 +106,7 @@ export class userController {
                     const hashPassword = await bcrypt.hash(password, 10);
                     const otp = commonFunction.getOTP();
                     const otpExpTime = new Date().getTime() + 180000; // 3 minutes expiry
-                    await updateUser(
+                    await userModel.findByIdAndUpdate(
                         {
                             _id: existingUser._id,
                         },
@@ -122,13 +122,13 @@ export class userController {
                     return res.json(
                         new response(
                             {
-                                OTP,
+                                otp,
                             },
-                            responseMessage.OTP_SEND
+                            responseMessage.OTP_SENT
                         )
                     );
                 }
-                throw apiError.conflict(responseMessage.USER_EXISTS);
+                throw apiError.conflict(responseMessage.USER_ALREADY_EXISTS);
             }
             const hashPassword = await bcrypt.hash(password, 10);
             validatedBody.OTP = commonFunction.getOTP();
@@ -147,7 +147,7 @@ export class userController {
             };
 
             const newUser = await userModel.create(usersInfo);
-            return res.json(new response(newUser, responseMessage.USER_CREATED));
+            return res.json(new response(newUser, responseMessage.USER_REGISTERED));
         } catch (error) {
             console.error("Error during sign-up:", error);
             return next(error);
