@@ -11,9 +11,9 @@
   },
   "swaggerDefinition": {
     "info": {
-      "title": "wearo-journey Application",
+      "title": "wearO-journey Application",
       "version": "2.0",
-      "description": "wearo-journey Application API Docs"
+      "description": "wearO-journey Application API Docs"
     },
     "basePath": "/api/v1",
     "securityDefinitions": {

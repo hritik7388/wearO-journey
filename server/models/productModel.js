@@ -1,4 +1,4 @@
-import gender from "../enum/gender";
+import gender from "../enum/gender"; 
 import status from "../enum/status";
 import Mongoose, {Schema} from "mongoose";
 import mongoosePaginate from "mongoose-paginate";
@@ -26,7 +26,7 @@ const productModel = new Schema(
         },
         gender: {
             type: String,
-            enum: [gender.MALE, gender.FEMALE, gender.OTHER],
+            enum: [gender.MALE, gender.FEMALE, gender.OTHER,gender.UNISEX],
         },
         sizes: [String], // e.g. ["S", "M", "L", "XL"]
         colors: [String], // e.g. ["Red", "Blue", "Black"]
@@ -59,7 +59,7 @@ const productModel = new Schema(
         ],
         status: {
             type: String,
-            enum: [status.ACTIVE, status.BLOCKED, status.DELETED],
+            enum: [status.ACTIVE, status.BLOCKED, status.DELETED,status.OUT_OF_STOCK,status.UPCOMING],
             default: status.ACTIVE,
         },
     },

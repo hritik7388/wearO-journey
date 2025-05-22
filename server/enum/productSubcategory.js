@@ -4,4 +4,5 @@ module.exports = Object.freeze({
   DRESSES: 'DRESSES',
   SHOES: 'SHOES',
   ACCESSORIES: 'ACCESSORIES',
+  
 });
