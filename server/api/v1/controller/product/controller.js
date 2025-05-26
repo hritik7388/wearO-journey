@@ -324,7 +324,7 @@ export class productController {
             }
             const product = await productModel.findOne({
                 _id: validatedBody._id,
-                status: {$ne: status.DELETE},
+                productStatus: {$ne: status.DELETE},
             });
             if (!product) {
                 throw apiError.notFound(responseMessage.PRODUCT_NOT_FOUND);
