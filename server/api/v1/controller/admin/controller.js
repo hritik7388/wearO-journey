@@ -6,6 +6,7 @@ import apiError from "../../../../helper/apiError";
 import commonFunction from "../../../../helper/util";
 import response from "../../../../../assets/response";
 import userModel from "../../../../models/userModel";
+import productModel from "../../../../models/productModel";
 import responseMessage from "../../../../../assets/responseMessage";
 import {userServices} from "../../services/userServices";
 const {
@@ -1042,6 +1043,130 @@ export class adminController {
             return next(error);
         }
     }
+
+/**
+ * @swagger
+ * /admin/deleteProduct:
+ *   delete:
+ *     tags:
+ *       - ADMIN_PRODUCT_MANAGEMENT
+ *     description: Admin deletes a product (soft delete by updating status)
+ *     produces:
+ *       - application/json
+ *     parameters:
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         description: Admin's access token
+ *       - name: _id
+ *         in: query
+ *         required: true
+ *         description: Product ID to delete
+ *     responses:
+ *       200:
+ *         description: Product deleted successfully
+ */
+async deleteProduct(req, res, next) {
+    const validationSchema = Joi.object({
+        _id: Joi.string().required()
+    });
+
+    try {
+        const validatedBody = await Joi.validate(req.query, validationSchema);
+        const { _id } = validatedBody;
+
+        // Validate admin
+        const admin = await userModel.findOne({
+            _id: req.userId,
+            status: { $ne: status.DELETE },
+            userType: userType.ADMIN,
+        });
+        if (!admin) throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+
+        // Validate product existence
+        const product = await productModel.findOne({
+            _id,
+            status: { $ne: status.DELETE },
+        });
+        if (!product) throw apiError.notFound(responseMessage.DATA_NOT_FOUND);
+
+        // Soft delete the product
+        const deleted = await productModel.findByIdAndUpdate(
+            _id,
+            { $set: { status: status.DELETE } },
+            { new: true }
+        );
+
+        return res.json(new response(deleted, responseMessage.DELETE_SUCCESS));
+    } catch (error) {
+        return next(error);
+    }
+}
+
+
+/**
+ * @swagger
+ * /admin/blockUnblockProduct:
+ *   put:
+ *     tags:
+ *       - ADMIN_PRODUCT_MANAGEMENT
+ *     description: blockUnblockProduct - When Admin wants to block/unblock a product
+ *     produces:
+ *       - application/json
+ *     parameters:
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         description: Admin token
+ *       - name: _id
+ *         in: query
+ *         required: true
+ *         description: Product _id to block/unblock
+ *     responses:
+ *       200:
+ *         description: Returns success message
+ */
+async blockUnblockProduct(req, res, next) {
+    const validationSchema = {
+        _id: Joi.string().required(),
+    };
+    try {
+        const validatedBody = await Joi.validate(req.query, validationSchema);
+   const { _id } = validatedBody;
+
+        // Validate admin user
+        const admin = await userModel.findOne({
+            _id: req.userId,
+            status: { $ne: status.DELETE },
+            userType: userType.ADMIN,
+        });
+        if (!admin) throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+
+        // Find the product
+        const product = await productModel.findOne({ _id });
+        if (!product) throw apiError.notFound(responseMessage.DATA_NOT_FOUND);
+
+        // Toggle productStatus
+        const newStatus = product.productStatus === status.ACTIVE
+            ? status.BLOCK
+            : status.ACTIVE;
+
+        const updatedProduct = await productModel.findByIdAndUpdate(
+            _id,
+            { $set: { productStatus: newStatus } },
+            { new: true }
+        );
+
+        const message = newStatus === status.BLOCK
+            ? "Product blocked successfully"
+            : "Product unblocked successfully";
+
+        return res.json(new response(updatedProduct, message));
+    } catch (error) {
+        return next(error);
+    }
+}
+ 
 }
 export default new adminController();
 //work on progress

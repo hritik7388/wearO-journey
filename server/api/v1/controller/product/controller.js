@@ -6,8 +6,8 @@ import apiError from "../../../../helper/apiError";
 import commonFunction from "../../../../helper/util";
 import response from "../../../../../assets/response";
 import userModel from "../../../../models/userModel";
-import productModel from "../../../../models/productModel"; 
-import responseMessage from "../../../../../assets/responseMessage"; 
+import productModel from "../../../../models/productModel";
+import responseMessage from "../../../../../assets/responseMessage";
 
 export class productController {
     /**
@@ -370,6 +370,135 @@ export class productController {
         }
     }
 
+    /**
+     * @swagger
+     * /product/viewProduct:
+     *   get:
+     *     tags:
+     *       - PRODUCT
+     *     description: view basic Details of any Product with _id
+     *     produces:
+     *       - application/json
+     *     parameters:
+     *       - name: token
+     *         description: token
+     *         in: header
+     *         required: true
+     *       - name: _id
+     *         description: _id
+     *         in: query
+     *         required: false
+     *     responses:
+     *       200:
+     *         description: Returns success message
+     */
+    async viewProduct(req, res, next) {
+        const validationSchema = {
+            _id: Joi.string().required(),
+        };
+        try {
+            const validatedBody = await Joi.validate(req.query, validationSchema);
+            let userResult = await userModel.findOne({
+                _id: req.userId,
+                status: {$ne: status.DELETE},
+            });
+            if (!userResult) {
+                throw apiError.notFound(responseMessage.PRODUCT_NOT_FOUND);
+            }
+            var productInfo = await productModel.findOne({
+                _id: validatedBody._id,
+                status: {$ne: status.DELETE},
+            });
+            console.log("userInfo==>>>>", productInfo);
+            if (!productInfo) {
+                throw apiError.notFound(responseMessage.DATA_NOT_FOUND);
+            }
+            return res.json(new response(productInfo, responseMessage.DATA_FOUND));
+        } catch (error) {
+            console.log("btcBal.balance==>>", error);
+            return next(error);
+        }
+    }
 
+    /**
+     * @swagger
+     * /product/listProducts:
+     *   get:
+     *     tags:
+     *       - PRODUCT
+     *     description: List all products with pagination
+     *     produces:
+     *       - application/json
+     *     parameters:
+     *       - name: token
+     *         in: header
+     *         required: true
+     *         description: Bearer token for authentication
+     *         type: string
+     *       - name: page
+     *         in: query
+     *         required: false
+     *         description: Page number (default 1)
+     *         type: integer
+     *       - name: limit
+     *         in: query
+     *         required: false
+     *         description: Number of products per page (default 10)
+     *         type: integer
+     *     responses:
+     *       200:
+     *         description: Returns paginated list of products
+     *       401:
+     *         description: Unauthorized
+     *       500:
+     *         description: Internal server error
+     */
+    async listProducts(req, res, next) {
+        try {
+            // Validate pagination query params with defaults
+            const page = parseInt(req.query.page) > 0 ? parseInt(req.query.page) : 1;
+            const limit = parseInt(req.query.limit) > 0 ? parseInt(req.query.limit) : 10;
+            const skip = (page - 1) * limit;
+
+            // Check user authentication and status
+            const userData = await userModel.findOne({
+                _id: req.userId,
+                status: {$ne: status.DELETE},
+            });
+
+            if (!userData) {
+                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+            }
+
+            // Fetch total count for pagination info
+            const totalProducts = await productModel.countDocuments({
+                productStatus: {$ne: status.DELETE},
+            });
+
+            // Fetch paginated products excluding deleted
+            const products = await productModel
+            .find({productStatus: {$ne: status.DELETE}})
+            .skip(skip)
+            .limit(limit)
+            .sort({createdAt: -1}); // Optional: latest products first
+
+            res.status(200).json({
+                status: true,
+                message: responseMessage.DATA_FOUND,
+                data: {
+                    products,
+                    pagination: {
+                        total: totalProducts,
+                        page,
+                        limit,
+                        pages: Math.ceil(totalProducts / limit),
+                    },
+                },
+            });
+        } catch (error) {
+            console.log("listProducts error:", error);
+            return next(error);
+        }
+    }
 }
 export default new productController();
