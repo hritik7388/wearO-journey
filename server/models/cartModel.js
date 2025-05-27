@@ -13,13 +13,15 @@ const cartSchema = new Schema(
             {
                 productId: {type: Schema.Types.ObjectId, ref: "product", required: true},
                 inventoryId: {type: Schema.Types.ObjectId, ref: "inventory", required: true},
+                 productName: { type: String, required: true }, // Name of the product
                 quantity: {type: Number, required: true, min: 1},
                 price: {type: Number, required: true}, // Price at the time of adding to cart
                 colors: {type: [String], required: true}, // Changed to array
                 sizes: {type: [String], required: true},
+                totalAmount: {type: Number, default: 0},
             },
         ],
-        totalAmount: {type: Number, default: 0}, // Total amount for all items in the cart
+        subtotal: {type: Number, default: 0}, // Total amount for all items in the cart
         status: {
             type: String,
             enum: ["ACTIVE", "CHECKED_OUT", "CANCELLED"],

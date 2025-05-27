@@ -35,7 +35,7 @@ module.exports = {
   ORDER_PLACED: "Order placed successfully.",
   ORDER_RETURNED: "Return request submitted.",
   ORDER_TRACKING_FETCHED: "Tracking details fetched successfully.",
-  OUT_OF_STOCK: "Product is out of stock.",
+  OUT_OF_STOCK: "Product is out of stock from inventory.",
   OTP_SENT: "OTP sent successfully.",
   OTP_VERIFIED: "OTP verified successfully.",
   OTP_EXPIRED: "OTP expired.",

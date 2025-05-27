@@ -14,7 +14,7 @@ const warehouseSchema = new Schema(
             required: true,
             trim: true,
         },
- 
+
         address: {
             street: {type: String, required: true},
             city: {type: String, required: true},
@@ -56,6 +56,7 @@ const warehouseSchema = new Schema(
             enum: ["ACTIVE", "INACTIVE", "MAINTENANCE"],
             default: "ACTIVE",
         },
+ 
     },
     options
 );

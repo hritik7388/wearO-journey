@@ -144,6 +144,17 @@ async createWarehouse(req, res, next) {
         if (!userData) {
             throw apiError.notFound(responseMessage.USER_NOT_FOUND);
         }
+               // 🚨 Check for duplicate warehouseName or address.street
+        const duplicateWarehouse = await wareHouseModel.findOne({
+            $or: [
+                { warehouseName: validatedBody.warehouseName },
+                { "address.street": validatedBody.address.street }
+            ]
+        });
+
+        if (duplicateWarehouse) {
+            throw apiError.badRequest("Warehouse with same name or address already exists");
+        }
 
         const warehouseData = await wareHouseModel.create(validatedBody);
 
