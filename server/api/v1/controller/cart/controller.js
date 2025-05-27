@@ -134,22 +134,17 @@ async addProductToCart(req, res, next) {
             });
         }
 
-        const productPrice = productData.price || 0;
-
-        // Find cart for the user
+        const productPrice = productData.price || 0; 
         let cart = await cartModel.findOne({ userId: req.userId, status: "ACTIVE" });
 
-        if (!cart) {
-            // Create new cart for user
+        if (!cart) { 
             cart = new cartModel({
                 userId: req.userId,
                 items: [],
                 subtotal: 0,
                 status: "ACTIVE",
             });
-        }
-
-        // Check if the same product+inventory+colors+sizes already exists in cart
+        } 
         let existingItemIndex = cart.items.findIndex(
             item =>
                 item.productId.toString() === productId &&
@@ -168,8 +163,7 @@ async addProductToCart(req, res, next) {
 
             cart.items[existingItemIndex].quantity = newQuantity;
             cart.items[existingItemIndex].totalAmount = newQuantity * productPrice;
-        } else {
-            // Check if inventory has enough stock
+        } else { 
             if (inventoryData.stockAvailable < quantity) {
                 throw apiError.badRequest(responseMessage.OUT_OF_STOCK);
             }
@@ -184,14 +178,10 @@ async addProductToCart(req, res, next) {
                 sizes,
                 totalAmount: quantity * productPrice,
             });
-        }
-
-        // Recalculate subtotal
+        } 
         cart.subtotal = cart.items.reduce((sum, item) => sum + item.totalAmount, 0);
 
-        await cart.save();
-
-        // Update inventory stock
+        await cart.save(); 
         await inventoryModel.findByIdAndUpdate(inventoryId, {
             $inc: { stockAvailable: -quantity },
         });
