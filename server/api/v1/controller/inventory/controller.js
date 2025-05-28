@@ -110,6 +110,18 @@ export class inventoryController {
                 throw apiError.notFound(responseMessage.USER_NOT_FOUND);
             }
 
+            const existingData = await inventoryModel.findOne({
+                productId: validatedBody.productId,
+                warehouseId: validatedBody.warehouseId,
+            });
+
+            if (existingData) {
+                return res.status(400).json({
+                    responseCode: 400,
+                    responseMessage: "Inventory already exists for this product and warehouse.",
+                });
+            }
+
             const productData = await productModel.findOne({
                 _id: validatedBody.productId,
                 productStatus: status.ACTIVE,
@@ -155,7 +167,7 @@ export class inventoryController {
                 _id: validatedBody.warehouseId,
                 status: {$ne: status.DELETE},
             });
-                const existingInventory = await inventoryModel.findOne({
+            const existingInventory = await inventoryModel.findOne({
                 productId: validatedBody.productId,
                 warehouseId: validatedBody.warehouseId,
             });
@@ -171,7 +183,7 @@ export class inventoryController {
                     responseMessage: `Warehouse does not have enough total stock to allocate (${warehouseData.totalStock})`,
                 });
             }
-               let updatedStockAvailable = validatedBody.stockAvailable || 0;
+            let updatedStockAvailable = validatedBody.stockAvailable || 0;
             if (existingInventory) {
                 updatedStockAvailable += existingInventory.stockAvailable || 0;
             }
@@ -181,7 +193,6 @@ export class inventoryController {
                 validatedBody.warehouseId,
                 {
                     totalStock: updatedTotalStock,
-                    
                 },
                 {new: true}
             );
@@ -210,7 +221,7 @@ export class inventoryController {
                 data: inventoryData,
             });
         } catch (error) {
-          console.error("createInventory error:", error);
+            console.error("createInventory error:", error);
             return next(error);
         }
     }

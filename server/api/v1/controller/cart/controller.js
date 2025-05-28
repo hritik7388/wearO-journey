@@ -200,5 +200,156 @@ async addProductToCart(req, res, next) {
     }
 }
 
+/**
+ * @swagger
+ * /cart/updateProductToCart:
+ *   put:
+ *     summary: Update quantity of a product in the cart
+ *     tags:
+ *       - CART
+ *     description: Updates the quantity of an existing product in the user's cart. Also adjusts inventory stock.
+ *     consumes:
+ *       - application/json
+ *     produces:
+ *       - application/json
+ *     parameters:
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         description: Bearer token for authentication
+ *         type: string
+ *       - in: body
+ *         name: body
+ *         required: true
+ *         description: Cart update details
+ *         schema:
+ *           type: object
+ *           required:
+ *             - _id
+ *             - itemId
+ *             - quantity
+ *           properties:
+ *             _id:
+ *               type: string
+ *               description: Cart ID
+ *             itemId:
+ *               type: string
+ *               description: Item ID inside cart (cart.items array)
+ *             quantity:
+ *               type: number
+ *               description: New quantity for the item (minimum 1)
+ *     responses:
+ *       200:
+ *         description: Cart item updated successfully
+ *       400:
+ *         description: Validation error or out-of-stock
+ *       404:
+ *         description: Cart or item or inventory not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+
+async updateProductToCart(req, res, next) {
+    const validationSchema = {
+        _id: Joi.string().required(),
+        itemId: Joi.string().required(),
+        quantity: Joi.number().min(0).required()  // note: min changed from 1 to 0
+    };
+
+    try {
+        const validatedBody = await Joi.validate(req.body, validationSchema);
+        const { _id, itemId, quantity } = validatedBody;
+
+        const userData = await userModel.findOne({
+            _id: req.userId,
+            userType: userType.USER,
+            status: { $ne: status.DELETE },
+        });
+        if (!userData) throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+
+        const cart = await cartModel.findOne({
+            _id:validatedBody._id,
+            userId: userData._id,
+            status: status.ACTIVE,
+        });
+        if (!cart) throw apiError.notFound("Cart not found");
+
+        const itemIndex = cart.items.findIndex(item => item._id.toString() === itemId);
+        if (itemIndex === -1) throw apiError.notFound("Cart item not found");
+        console.log("itemIndex============>>>",itemIndex)
+
+        const item = cart.items[itemIndex];
+        const oldQuantity = item.quantity;
+        const diff = quantity - oldQuantity;
+
+        const inventory = await inventoryModel.findOne({
+            _id: item.inventoryId,
+            productId: item.productId,
+            status: status.ACTIVE
+        });
+        if (!inventory) throw apiError.notFound("Inventory not found");
+
+        if (quantity === 0) {
+            // Restore stock for the removed quantity
+            await inventoryModel.findByIdAndUpdate(item.inventoryId, {
+                $inc: { stockAvailable: oldQuantity }
+            });
+
+            // Remove the item from cart
+            cart.items.splice(itemIndex, 1);
+
+            // Update subtotal
+            cart.subtotal = cart.items.reduce((sum, itm) => sum + itm.totalAmount, 0);
+
+            // If no items left, delete cart
+            if (cart.items.length === 0) {
+                await cartModel.findByIdAndDelete(cart._id);
+                return res.status(200).json({
+                    responseCode: 200,
+                    responseMessage: "Item removed and cart deleted as it's empty now",
+                    data: null,
+                    subtotal: 0,
+                });
+            } else {
+                await cart.save();
+                return res.status(200).json({
+                    responseCode: 200,
+                    responseMessage: "Item removed from cart",
+                    data: null,
+                    subtotal: cart.subtotal,
+                });
+            }
+        }
+
+        // quantity > 0, normal update flow
+        if (diff > 0 && inventory.stockAvailable < diff) {
+            throw apiError.badRequest(responseMessage.OUT_OF_STOCK);
+        }
+
+        await inventoryModel.findByIdAndUpdate(item.inventoryId, {
+            $inc: { stockAvailable: -diff }
+        });
+
+        item.quantity = quantity;
+        item.totalAmount = quantity * item.price;
+
+        cart.subtotal = cart.items.reduce((sum, itm) => sum + itm.totalAmount, 0);
+        await cart.save();
+
+        return res.status(200).json({
+            responseCode: 200,
+            responseMessage: "Cart updated successfully",
+            data: item,
+            subtotal: cart.subtotal,
+        });
+
+    } catch (error) {
+        console.error("Error in updateProductToCart:", error);
+        return next(error);
+    }
+}
+
 }
 export default new CartController();

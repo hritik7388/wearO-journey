@@ -120,6 +120,7 @@ export class adminController {
                 userType: userType.ADMIN,
                 status: {$ne: status.DELETE},
             });
+            console.log("userResult=================>>>>>",userResult)
             if (!userResult) {
                 throw apiError.notFound(responseMessage.USER_NOT_FOUND);
             }

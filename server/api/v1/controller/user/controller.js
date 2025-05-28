@@ -228,7 +228,7 @@ export class userController {
         };
         try {
             const validatedBody = await Joi.validate(req.body, validationSchema);
-            const {email, otp} = validatedBody;
+            const {email, otp,deviceToken,deviceType} = validatedBody;
             const userData = await userModel.findOne({
                 email: email,
                 userType: userType.USER,
@@ -236,6 +236,7 @@ export class userController {
                     $ne: status.DELETE,
                 },
             });
+            console.log("userData==============>>>>>",userData)
             if (!userData) {
                 throw apiError.notFound(responseMessage.USER_NOT_FOUND);
             }
@@ -263,7 +264,10 @@ export class userController {
                 id: upadteUser._id,
                 email: upadteUser.email,
                 mobileNumber: upadteUser.mobileNumber,
+                status:updateUser.status,
                 userType: upadteUser.userType,
+                 deviceToken: deviceToken,
+                deviceType: deviceType,
             });
             console.log("token=================>>>>", token);
             var userInfo = {
@@ -334,6 +338,7 @@ export class userController {
                 var token = await commonFunction.getToken({
                     _id: userResult._id,
                     email: userResult.email,
+                   mobileNumber: userResult.mobileNumber,
                     userType: userResult.userType,
                     status: userResult.status,
                     deviceToken: deviceToken,
@@ -817,17 +822,19 @@ export class userController {
         };
         try {
             const {password, confirmPassword} = await Joi.validate(req.body, validationSchema);
-            var userResult = await userModel.findOne({
+            const userdata = await userModel.findOne({
                 _id: req.userId,
-                status: {$ne: status.DELETE},
                 userType: userType.USER,
+                status: {
+                    $ne: status.DELETE,
+                },
             });
-            if (!userResult) {
+            if (!userdata) {
                 throw apiError.notFound(responseMessage.USER_NOT_FOUND);
-            } else {
+            }else {
                 if (password == confirmPassword) {
                     let update = await userModel.findByIdAndUpdate(
-                        {_id: userResult._id},
+                        {_id: userdata._id},
                         {password: bcrypt.hashSync(password)},
                         {new: true}
                     );

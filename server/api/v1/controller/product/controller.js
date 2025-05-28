@@ -500,5 +500,6 @@ export class productController {
             return next(error);
         }
     }
+    
 }
 export default new productController();

@@ -7,5 +7,4 @@ export default Express.Router()
 
 .use(auth.verifyToken)
 .use(upload.uploadFile)
-.post('/addProductToCart', controller.addProductToCart)
-.put("/updateProductToCart",controller.updateProductToCart)
+.post('/createorder',controller.createorder)

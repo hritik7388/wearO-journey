@@ -59,7 +59,10 @@ module.exports = {
         var ID = Math.floor(10000000000 + Math.random() * 90000000000);
         return ID;
     },
-
+    generateTXNNumber() {
+        const tagNumber = `TXN-${Math.floor(100000 + Math.random() * 900000)}`;
+        return tagNumber;
+    },
     dateTime() {
         var today = new Date(new Date() - new Date().getTimezoneOffset() * 60 * 1000).toISOString();
         var check = "";
