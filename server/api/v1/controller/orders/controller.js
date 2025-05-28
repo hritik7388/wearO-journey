@@ -157,6 +157,7 @@ export class OrderController {
                 subtotal = cartData.subtotal;
                 console.log("subtotal===============>>>>>", subtotal);
             }
+            const TXN=await commonFunction .generateTXNNumber();
             const createOrders = await orderModel.create({
                 userId: userdata._id,
                 cartId: cartData._id,
@@ -178,7 +179,7 @@ export class OrderController {
                 paymentStatus,
                 paymentMode,
                 orderStatus,
-                trackingId,
+                trackingId:TXN,
                 deliveryAddress: {
                     postalCode: userdata.postalCode,
                     country: userdata.country,
