@@ -12,6 +12,12 @@ import responseMessage from "../../../../../assets/responseMessage";
 import cartModel from "../../../../models/cartModel";
 import orderModel from "../../../../models/orderModel";
 import {items} from "joi/lib/types/array";
+const Razorpay = require("razorpay");
+
+const razorpay = new Razorpay({
+    key_id: "rzp_test_XOIXzlbvgcWlzr",
+    key_secret: "7FMO9e0hA3CMwofq0CxBi92q"
+});
 
 export class OrderController {
     /**
@@ -92,112 +98,255 @@ export class OrderController {
             trackingId: Joi.string().optional(),
         };
         try {
-            const validatedBody = await Joi.validate(req.body, validationSchema);
-            const {
-                userId,
-                cartId,
-                itemId,
-                tax,
-                shippingCharges,
-                discount,
-                totalAmount,
-                paymentStatus,
-                paymentMode,
-                orderStatus,
-                trackingId,
-            } = validatedBody;
-            const userdata = await userModel.findOne({
-                _id: req.userId,
-                status: {$ne: status.DELETE},
-                userType: userType.USER,
-            });
-            console.log("userdata=====================>>>", userdata);
-            if (!userdata) {
-                return next(apiError.notFound(responseMessage.USER_NOT_FOUND));
-            }
-            const cartData = await cartModel.findOne({
-                _id: validatedBody.cartId,
-                status: {$ne: status.DELETE},
-            });
-            console.log("cartData=======================>>>>>", cartData);
-            if (!cartData) {
-                return next(apiError.notFound(responseMessage.CART_NOT_FOUND));
-            }
+    const validatedBody = await Joi.validate(req.body, validationSchema);
+    const {
+      cartId,
+      itemId,
+      tax,
+      shippingCharges,
+      discount,
+      paymentStatus,
+      paymentMode,
+      orderStatus,
+    } = validatedBody;
 
-            // Prepare items to order
-            let itemsToOrder = [];
-            console.log("itemsToOrder==================>>>>", itemsToOrder);
+    // Fetch user and cart same as before
+    const userdata = await userModel.findOne({ _id: req.userId, status: { $ne: status.DELETE }, userType: userType.USER });
+    if (!userdata) return next(apiError.notFound(responseMessage.USER_NOT_FOUND));
 
-            if (itemId) {
-                // Find the specific item in cart by itemId
-                const item = cartData.items.find((i) => i._id.toString() === itemId);
-                console.log("item===============>>>>", item);
-                if (!item) {
-                    return next(apiError.notFound("Item not found in cart"));
-                }
-                itemsToOrder.push(item);
-            } else {
-                // Order all items in cart
-                itemsToOrder = cartData.items;
-                console.log("itemsToOrder=================<>>>", itemsToOrder);
-            }
+    const cartData = await cartModel.findOne({ _id: cartId, status: { $ne: status.DELETE } });
+    if (!cartData) return next(apiError.notFound(responseMessage.CART_NOT_FOUND));
 
-            if (itemsToOrder.length === 0) {
-                return next(apiError.badRequest("No items found to order"));
-            }
-
-            // Calculate subtotal based on itemId presence
-            let subtotal;
-            if (itemId) {
-                // Subtotal is totalAmount of the single item
-                subtotal = itemsToOrder[0].totalAmount;
-                console.log("subtotal===============>>>>>", subtotal);
-            } else {
-                // Subtotal is cart's stored subtotal
-                subtotal = cartData.subtotal;
-                console.log("subtotal===============>>>>>", subtotal);
-            }
-            const TXN=await commonFunction .generateTXNNumber();
-            const createOrders = await orderModel.create({
-                userId: userdata._id,
-                cartId: cartData._id,
-                items: itemsToOrder.map((item) => ({
-                    productId: item.productId,
-                    inventoryId: item.inventoryId,
-                    productName: item.productName,
-                    quantity: item.quantity,
-                    price: item.price,
-                    sizes: item.sizes,
-                    colors: item.colors,
-                    totalAmount: item.totalAmount,
-                })),
-                subtotal: subtotal,
-                subtotal: subtotal,
-                tax: tax || 0,
-                shippingCharges: shippingCharges,
-                discount: discount,
-                paymentStatus,
-                paymentMode,
-                orderStatus,
-                trackingId:TXN,
-                deliveryAddress: {
-                    postalCode: userdata.zipCode,
-                    country: userdata.country,
-                    state: userdata.state,
-                    city: userdata.city,
-                    street: userdata.streetName,
-                    address:userdata.address,
-                    building:userdata.building
-                },
-            });
-            return res.json(new response(createOrders, responseMessage.ORDER_CREATED));
-        } catch (error) {
-            console.error("Error in createorder:=====>>>>>>>>", error);
-            return next(error);
-        }
+    let itemsToOrder = [];
+    if (itemId) {
+      const item = cartData.items.find(i => i._id.toString() === itemId);
+      if (!item) return next(apiError.notFound("Item not found in cart"));
+      itemsToOrder.push(item);
+    } else {
+      itemsToOrder = cartData.items;
     }
+    if (itemsToOrder.length === 0) return next(apiError.badRequest("No items found to order"));
+
+    let subtotal;
+    if (itemId) {
+      subtotal = itemsToOrder[0].totalAmount;
+    } else {
+      subtotal = cartData.subtotal;
+    }
+
+    // Razorpay order creation
+    const razorpayOrderOptions = {
+    amount: Math.floor(subtotal * 100), // amount in paise (multiply by 100)
+      currency: "INR",
+      receipt: `receipt_${Date.now()}`,
+      payment_capture: 1, // auto capture payment
+      notes: {
+        userId: userdata._id.toString(),
+        cartId: cartData._id.toString(),
+      },
+    };
+
+    const razorpayOrder = await razorpay.orders.create(razorpayOrderOptions);
+    console.log("Razorpay Order created:", razorpayOrder);
+
+    // Generate your own trackingId (TXN)
+    const TXN = await commonFunction.generateTXNNumber();
+
+    // Create your order in DB including razorpayOrderId
+    const createOrders = await orderModel.create({
+      userId: userdata._id,
+      cartId: cartData._id,
+      items: itemsToOrder.map(item => ({
+        productId: item.productId,
+        inventoryId: item.inventoryId,
+        productName: item.productName,
+        quantity: item.quantity,
+        price: item.price,
+        sizes: item.sizes,
+        colors: item.colors,
+        totalAmount: item.totalAmount,
+      })),
+      subtotal: subtotal,
+      tax: tax || 0,
+      shippingCharges: shippingCharges,
+      discount: discount,
+      paymentStatus,
+      paymentMode,
+      orderStatus,
+      trackingId: TXN,
+      razorpayOrderId: razorpayOrder.id,  // Store razorpay order id here
+      deliveryAddress: {
+        postalCode: userdata.zipCode,
+        country: userdata.country,
+        state: userdata.state,
+        city: userdata.city,
+        street: userdata.streetName,
+        address: userdata.address,
+        building: userdata.building,
+    },
+    razorpayOrderId: razorpayOrder.id
+    });
+
+    return res.json(new response(createOrders, responseMessage.ORDER_CREATED));
+  } catch (error) {
+    console.error("Error in createorder:=====>>>>>>>>", error);
+    return next(error);
+  }
+}
+
+/**
+ * @swagger
+ * /order/checkout:
+ *   post:
+ *     summary: Initiate payment for an order
+ *     tags:
+ *       - ORDER
+ *     description: |
+ *       Initiates payment using Razorpay for the given order ID.
+ *       It calculates the subtotal and returns a Razorpay order object.
+ *     consumes:
+ *       - application/json
+ *     produces:
+ *       - application/json
+ *     parameters:
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         description: Bearer token for authentication
+ *         type: string
+ *       - in: body
+ *         name: body
+ *         required: true
+ *         description: Order checkout details
+ *         schema:
+ *           type: object
+ *           required:
+ *             - orderId
+ *           properties:
+ *             orderId:
+ *               type: string
+ *               description: The ID of the order to process for payment
+ *     responses:
+ *       200:
+ *         description: Razorpay order created successfully
+ *         schema:
+ *           type: object
+ *           properties:
+ *             responseCode:
+ *               type: integer
+ *             responseMessage:
+ *               type: string
+ *             data:
+ *               type: object
+ *               properties:
+ *                 razorpayOrderId:
+ *                   type: string
+ *                 amount:
+ *                   type: integer
+ *                 currency:
+ *                   type: string
+ *       400:
+ *         description: Invalid order or already paid
+ *       401:
+ *         description: Unauthorized (Invalid or missing token)
+ *       404:
+ *         description: Order not found
+ *       500:
+ *         description: Internal server error
+ */
+async checkOut(req, res, next) {
+    const validationSchema = {
+        orderId: Joi.string().required(),  // This is Razorpay order ID now
+    };
+
+
+  try {
+    const validatedBody = await Joi.validate(req.body, validationSchema);
+    const { orderId } = validatedBody;
+
+    // 🔍 Find user
+    const userData = await userModel.findOne({
+      _id: req.userId,
+      status: status.ACTIVE,
+      userType: userType.USER,
+    });
+
+    if (!userData) {
+      return next(apiError.notFound(responseMessage.USER_NOT_FOUND));
+    }
+
+    // 🔍 Find order by Razorpay Order ID
+    const order = await orderModel.findOne({
+      razorpayOrderId: orderId,
+    });
+
+    if (!order) {
+      return next(apiError.notFound("Order not found"));
+    }
+
+    if (order.paymentStatus === "PAID") {
+      return res.status(400).json({
+        responseCode: 400,
+        responseMessage: "Order already paid",
+      });
+    }
+
+    const amount = order.subtotal || 0;
+    if (amount <= 0) {
+      return res.status(400).json({
+        responseCode: 400,
+        responseMessage: "Invalid order subtotal",
+      });
+    }
+
+    // 🧾 Create Razorpay Payment Link
+    const paymentLink = await razorpay.paymentLink.create({
+      amount: Math.round(amount * 100), // in paise
+      currency: "INR",
+      accept_partial: false,
+      reference_id: order._id.toString(),
+      description: "Order Payment",
+      customer: {
+        name: `${userData.firstName} ${userData.lastName}`,
+        email: userData.email,
+         
+      },
+      notify: {
+        sms: true,
+        email: true,
+      },
+      reminder_enable: true,
+      callback_url: "https://yourdomain.com/verify-payment", // Replace with your callback handler
+      callback_method: "get",
+    });
+    console.log("paymentLink====================>>>",paymentLink)
+    
+
+    // 💾 Optional: Save payment link ID
+    order.razorpayPaymentLinkId = paymentLink.id;
+    await order.save();
+    console.log("order.razorpayPaymentLinkId==============>>>",order.razorpayPaymentLinkId)
+
+
+    return res.status(200).json({
+      responseCode: 200,
+      responseMessage: "Payment link created successfully",
+      data: {
+        paymentLink: paymentLink.short_url,
+        razorpayPaymentLinkId: paymentLink.id,
+      },
+    });
+  } catch (error) {
+    console.log("Checkout Error =====>", error);
+    return next(error);
+  }
+}
 }
 export default new OrderController();
+
+
+// Key ID:rzp_test_XOIXzlbvgcWlzr
+// Key Secret:
 
 // await inventoryModel.findByIdAndUpdate(inventoryId, {
 //     $inc: { stockAvailable: -quantity },

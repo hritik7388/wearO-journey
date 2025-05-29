@@ -11,7 +11,14 @@ import apiErrorHandler from "../helper/apiErrorHandler";
 import dotenv from "dotenv";
 dotenv.config();
 const app = new express();
-const server = http.createServer(app);
+const server = http.createServer(app); 
+app.use(express.json());
+ 
+app.get('/index.html', (req, res) => {
+  app.use(express.static(path.join(__dirname, 'frontend')));
+
+});
+ 
 const root = path.normalize(`${__dirname}/../..`);
 class ExpressServer {
     constructor() {
@@ -35,6 +42,7 @@ class ExpressServer {
                 preflightContinue: false,
             })
         );
+ 
     }
     router(routes) {
         routes(app);

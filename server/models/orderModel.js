@@ -69,6 +69,8 @@ const orderSchema = new Schema(
     },
 
     trackingId: { type: String }, // Optional shipment tracking
+
+    razorpayOrderId: {type:String}
   },
   options
 );

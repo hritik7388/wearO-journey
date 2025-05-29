@@ -1,6 +1,6 @@
 {
   "port": 2026,
-  "hostAddress": "172.16.96:1989",
+  "hostAddress": "localhost:2026",
   "databaseHost": "localhost",
   "databasePort": "27017",
   "databaseName": "wearo-journey",
