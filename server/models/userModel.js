@@ -65,6 +65,9 @@ const userModel = new Schema(
     },
     options
 );
+
+userModel.index({ location: "2dsphere" });
+
 userModel.plugin(mongoosePaginate);
 userModel.plugin(mongooseAggregatePaginate);
 module.exports = Mongoose.model("user", userModel);

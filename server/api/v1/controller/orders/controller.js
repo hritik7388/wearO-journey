@@ -181,11 +181,13 @@ export class OrderController {
                 orderStatus,
                 trackingId:TXN,
                 deliveryAddress: {
-                    postalCode: userdata.postalCode,
+                    postalCode: userdata.zipCode,
                     country: userdata.country,
                     state: userdata.state,
                     city: userdata.city,
-                    street: userdata.street,
+                    street: userdata.streetName,
+                    address:userdata.address,
+                    building:userdata.building
                 },
             });
             return res.json(new response(createOrders, responseMessage.ORDER_CREATED));
@@ -196,3 +198,26 @@ export class OrderController {
     }
 }
 export default new OrderController();
+
+// await inventoryModel.findByIdAndUpdate(inventoryId, {
+//     $inc: { stockAvailable: -quantity },
+// });
+
+  // Restore stock for the removed quantity
+            // await inventoryModel.findByIdAndUpdate(item.inventoryId, {
+            //     $inc: { stockAvailable: oldQuantity }
+            // });
+
+            // Remove the item from cart
+
+
+// const diff = quantity - oldQuantity;
+
+        // quantity > 0, normal update flow
+        // if (diff > 0 && inventory.stockAvailable < diff) {
+        //     throw apiError.badRequest(responseMessage.OUT_OF_STOCK);
+        // }
+
+        // await inventoryModel.findByIdAndUpdate(item.inventoryId, {
+        //     $inc: { stockAvailable: -diff }
+        // });

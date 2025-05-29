@@ -182,9 +182,7 @@ async addProductToCart(req, res, next) {
         cart.subtotal = cart.items.reduce((sum, item) => sum + item.totalAmount, 0);
 
         await cart.save(); 
-        await inventoryModel.findByIdAndUpdate(inventoryId, {
-            $inc: { stockAvailable: -quantity },
-        });
+       
 
         const addedItem = existingItemIndex !== -1 ? cart.items[existingItemIndex] : cart.items[cart.items.length - 1];
 
@@ -199,6 +197,9 @@ async addProductToCart(req, res, next) {
         return next(error);
     }
 }
+
+
+
 
 /**
  * @swagger
@@ -280,9 +281,8 @@ async updateProductToCart(req, res, next) {
         if (itemIndex === -1) throw apiError.notFound("Cart item not found");
         console.log("itemIndex============>>>",itemIndex)
 
-        const item = cart.items[itemIndex];
-        const oldQuantity = item.quantity;
-        const diff = quantity - oldQuantity;
+        const item = cart.items[itemIndex]; 
+        
 
         const inventory = await inventoryModel.findOne({
             _id: item.inventoryId,
@@ -292,12 +292,7 @@ async updateProductToCart(req, res, next) {
         if (!inventory) throw apiError.notFound("Inventory not found");
 
         if (quantity === 0) {
-            // Restore stock for the removed quantity
-            await inventoryModel.findByIdAndUpdate(item.inventoryId, {
-                $inc: { stockAvailable: oldQuantity }
-            });
-
-            // Remove the item from cart
+          
             cart.items.splice(itemIndex, 1);
 
             // Update subtotal
@@ -323,15 +318,7 @@ async updateProductToCart(req, res, next) {
             }
         }
 
-        // quantity > 0, normal update flow
-        if (diff > 0 && inventory.stockAvailable < diff) {
-            throw apiError.badRequest(responseMessage.OUT_OF_STOCK);
-        }
-
-        await inventoryModel.findByIdAndUpdate(item.inventoryId, {
-            $inc: { stockAvailable: -diff }
-        });
-
+    
         item.quantity = quantity;
         item.totalAmount = quantity * item.price;
 

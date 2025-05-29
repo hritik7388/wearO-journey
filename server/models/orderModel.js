@@ -46,6 +46,8 @@ const orderSchema = new Schema(
       state: { type: String, required: false },
       country: { type: String, required: false },
       postalCode: { type: String, required: false },
+      address:{type: String, required: false},
+      buildingName:{type: String, required: false}, 
     },
 
     paymentStatus: {

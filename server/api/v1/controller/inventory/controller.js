@@ -126,7 +126,7 @@ export class inventoryController {
             // Fetch product data
             const productData = await productModel.findOne({
                 _id: validatedBody.productId,
-                productStatus: status.ACTIVE,
+                status: status.ACTIVE,
             });
             if (!productData) {
                 throw apiError.notFound(responseMessage.PRODUCT_NOT_FOUND);
