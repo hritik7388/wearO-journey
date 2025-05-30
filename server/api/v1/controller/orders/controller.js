@@ -13,6 +13,7 @@ import cartModel from "../../../../models/cartModel";
 import orderModel from "../../../../models/orderModel";
 import {items} from "joi/lib/types/array";
 const Razorpay = require("razorpay");
+const crypto = require("crypto");
 
 const razorpay = new Razorpay({
     key_id: "rzp_test_XOIXzlbvgcWlzr",
@@ -318,14 +319,12 @@ async checkOut(req, res, next) {
       reminder_enable: true,
       callback_url: "https://yourdomain.com/verify-payment", // Replace with your callback handler
       callback_method: "get",
-    });
-    console.log("paymentLink====================>>>",paymentLink)
+    }); 
     
 
     // 💾 Optional: Save payment link ID
     order.razorpayPaymentLinkId = paymentLink.id;
-    await order.save();
-    console.log("order.razorpayPaymentLinkId==============>>>",order.razorpayPaymentLinkId)
+    await order.save(); 
 
 
     return res.status(200).json({
@@ -341,6 +340,71 @@ async checkOut(req, res, next) {
     return next(error);
   }
 }
+
+
+async razorpayWebhook(req, res) {
+  const secret = "hb@123";
+  const receivedSig = req.headers['x-razorpay-signature'];
+  const body = req.body; 
+  console.log("body=====================>>>>",body.payload.order)
+    console.log("body=====================>>>>",body.payload.payment)
+      // console.log("body=====================>>>>",body.payload.order)
+  
+  const expectedSig = crypto
+  .createHmac("sha256", secret)
+  .update(JSON.stringify(body))
+  .digest("hex");
+  
+  console.log("🧮 Expected Signature:", expectedSig);
+  
+  if (expectedSig !== receivedSig) { 
+    return res.status(400).send("Invalid signature");
+  } ;
+
+const orderId = body.payload.order.entity.receipt;
+  console.log("orderId========::>>>>>>",orderId)
+
+  // Process the webhook event
+  const razorpayOrderId = body.payload.payment.entity.order_id;
+  const razorpayPaymentId = body.payload.payment.entity.id;
+  
+  console.log("🔐 Received Signature:", receivedSig); 
+  console.log("📌 Razorpay Order ID:", razorpayOrderId);
+  console.log("💳 Razorpay Payment ID:", razorpayPaymentId);
+
+  try {
+    const updatedOrder = await orderModel.findOneAndUpdate(
+      { _id :orderId},
+      {
+        paymentStatus: "PAID",
+        razorpayPaymentId,        
+        razorpay_signature: expectedSig,
+        razorpayOrderId:razorpayOrderId,
+        razorpayPaymentId:razorpayPaymentId
+      },
+      { new: true }
+    ); 
+    console.log("updatedOrder=======================================>>>>",updatedOrder)
+
+    res.status(200).json({
+      success: true,
+      message: "Payment verified successfully",
+      data: {
+        updatedOrder,
+        razorpay_order_id: razorpayOrderId,
+        razorpay_payment_id: razorpayPaymentId,
+      }
+    });
+  } catch (err) {
+    console.error("❗ Error updating order:", err);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+}
+
+
 }
 export default new OrderController();
 

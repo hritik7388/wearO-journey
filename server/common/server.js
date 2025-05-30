@@ -9,6 +9,8 @@ import swaggerUi from "swagger-ui-express";
 import swaggerJSDoc from "swagger-jsdoc";
 import apiErrorHandler from "../helper/apiErrorHandler";
 import dotenv from "dotenv";
+import orderRoutes from '../routes';
+
 dotenv.config();
 const app = new express();
 const server = http.createServer(app); 
@@ -25,6 +27,8 @@ class ExpressServer {
         app.use(express.json({
             limit: "1000mb"
         }));
+        // app.use('/api/v1/order', orderRoutes);
+
 
         app.use(express.urlencoded({
             extended: true,
