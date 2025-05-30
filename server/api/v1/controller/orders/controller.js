@@ -11,6 +11,7 @@ import inventoryModel from "../../../../models/invetoryModel";
 import responseMessage from "../../../../../assets/responseMessage";
 import cartModel from "../../../../models/cartModel";
 import orderModel from "../../../../models/orderModel";
+import orderStatus from "../../../../enum/orderStatus";
 import {items} from "joi/lib/types/array";
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
@@ -21,103 +22,133 @@ const razorpay = new Razorpay({
 });
 
 export class OrderController {
-    /**
-     * @swagger
-     * /order/createorder:
-     *   post:
-     *     summary: Create a new order
-     *     tags:
-     *       - ORDER
-     *     description: Creates a new order based on cart details and user delivery address.
-     *     consumes:
-     *       - application/json
-     *     produces:
-     *       - application/json
-     *     parameters:
-     *       - name: token
-     *         in: header
-     *         required: true
-     *         description: Bearer token for authentication
-     *         type: string
-     *       - in: body
-     *         name: body
-     *         required: true
-     *         description: Order creation details
-     *         schema:
-     *           type: object
-     *           required:
-     *             - cartId
-     *             - paymentMode
-     *           properties:
-     *             cartId:
-     *               type: string
-     *             itemId:
-     *               type: string
-     *               description: Optional. Use to create order for a specific item in cart.
-     *             shippingCharges:
-     *               type: number
-     *               default: 0
-     *             discount:
-     *               type: number
-     *               default: 0
-     *             paymentStatus:
-     *               type: string
-     *               enum: [PENDING, PAID, FAILED, REFUNDED]
-     *               default: PENDING
-     *             paymentMode:
-     *               type: string
-     *               enum: [COD, ONLINE]
-     *             orderStatus:
-     *               type: string
-     *               enum: [PLACED, PROCESSING, SHIPPED, DELIVERED, CANCELLED]
-     *               default: PROCESSING
-     *             trackingId:
-     *               type: string
-     *     responses:
-     *       200:
-     *         description: Order successfully created
-     *       400:
-     *         description: Validation error or bad request
-     *       401:
-     *         description: Unauthorized (Invalid or missing token)
-     *       404:
-     *         description: User or cart not found
-     *       500:
-     *         description: Internal server error
-     */
+/**
+ * @swagger
+ * /order/createorder:
+ *   post:
+ *     summary: Create a new order
+ *     tags:
+ *       - ORDER
+ *     description: Creates a new order based on cart details and user delivery address. Shipping charges are dynamically calculated based on the nearest warehouse using Haversine formula.
+ *     consumes:
+ *       - application/json
+ *     produces:
+ *       - application/json
+ *     parameters:
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         type: string
+ *         description: Bearer token for authentication (e.g., "Bearer <token>")
+ *       - in: body
+ *         name: body
+ *         description: Order creation details
+ *         required: true
+ *         schema:
+ *           type: object
+ *           required:
+ *             - cartId
+ *             - paymentMode
+ *           properties:
+ *             cartId:
+ *               type: string
+ *               description: Cart ID from which order should be created
+ *             itemId:
+ *               type: string
+ *               description: (Optional) Item ID from the cart to create a partial order
+ *             paymentMode:
+ *               type: string
+ *               enum: [COD, ONLINE]
+ *               description: Payment method (Cash On Delivery or Online)
+ *     responses:
+ *       200:
+ *         description: Order successfully created
+ *         schema:
+ *           type: object
+ *           properties:
+ *             success:
+ *               type: boolean
+ *             message:
+ *               type: string
+ *             data:
+ *               type: object
+ *               description: Order details object
+ *       400:
+ *         description: Validation error or bad request
+ *       401:
+ *         description: Unauthorized (Invalid or missing token)
+ *       404:
+ *         description: User or cart not found
+ *       500:
+ *         description: Internal server error
+ */
+
     async createorder(req, res, next) {
         const validationSchema = {
             cartId: Joi.string().required(),
-            itemId: Joi.string().allow(null, "").optional(),
-            shippingCharges: Joi.number().default(0),
-            discount: Joi.number().default(0),
-            paymentStatus: Joi.string().valid("PENDING", "PAID", "FAILED", "REFUNDED").default("PENDING"),
-            paymentMode: Joi.string().valid("COD", "ONLINE").required(),
-            orderStatus: Joi.string()
-            .valid("PLACED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED")
-            .default("PROCESSING"),
-            trackingId: Joi.string().optional(),
+            itemId: Joi.string().allow(null, "").optional(),  
+            paymentMode: Joi.string().valid("COD", "ONLINE").required(), 
         };
         try {
     const validatedBody = await Joi.validate(req.body, validationSchema);
     const {
       cartId,
       itemId,
-      tax,
-      shippingCharges,
-      discount,
-      paymentStatus,
-      paymentMode,
-      orderStatus,
+       
+      paymentMode, 
     } = validatedBody;
 
     // Fetch user and cart same as before
     const userdata = await userModel.findOne({ _id: req.userId, status: { $ne: status.DELETE }, userType: userType.USER });
+       console.log("userdata===================>>>",userdata)
     if (!userdata) return next(apiError.notFound(responseMessage.USER_NOT_FOUND));
 
     const cartData = await cartModel.findOne({ _id: cartId, status: { $ne: status.DELETE } });
     if (!cartData) return next(apiError.notFound(responseMessage.CART_NOT_FOUND));
+    console.log("cartData=====================>>>>>",cartData)
 
+    const inventoryData=await inventoryModel.findOne({
+      _id:cartData.items[0].inventoryId,
+      status:status.ACTIVE
+    })
+     console.log("inventoryData====================>>>>",inventoryData)
+
+    if(!inventoryData){
+      return next(apiError.notFound(responseMessage.CART_NOT_FOUND));
+    }
+    const wareHouseData=await wareHouseModel.find({
+      _id:inventoryData.warehouseId,
+       status:status.ACTIVE
+
+    })
+    console.log("wareHouseData====================>>>>",wareHouseData)
+      if(!wareHouseData.length){
+      return next(apiError.notFound(responseMessage.PRODUCT_NOT_FOUND));
+    }
+
+    const warehousesArray = wareHouseData.map(w => ({
+     _id: w._id,
+     lat: w.address.location.coordinates[1], // GeoJSON: [lon, lat]
+     lon: w.address.location.coordinates[0],
+     name: w.warehouseName,
+   }));
+   console.log("warehousesArray===================>>>",warehousesArray)
+
+   // Prepare user location (make sure you have latitude and longitude fields in userdata)
+const userLocation = {
+  lat: userdata.location.coordinates[1], // latitude
+  lon: userdata.location.coordinates[0], // longitude
+   address: userdata.address || '',
+};
+   console.log("userLocation===================>>>",userLocation)
+
+
+   if (userLocation.lat === undefined || userLocation.lon === undefined) {
+     return next(apiError.badRequest("User location coordinates are missing"));
+   }
+
+   // Call your distance and shipping cost function
+   const shippingpayment = commonFunction.getNearestWarehouseAndShippingCost(userLocation, warehousesArray);
     let itemsToOrder = [];
     if (itemId) {
       const item = cartData.items.find(i => i._id.toString() === itemId);
@@ -128,29 +159,23 @@ export class OrderController {
     }
     if (itemsToOrder.length === 0) return next(apiError.badRequest("No items found to order"));
 
-    let subtotal;
+ 
+       let subtotal;
+    let totalDiscount = 0;
+    let totalShipping = 0;
     if (itemId) {
       subtotal = itemsToOrder[0].totalAmount;
+       totalDiscount += item.discount || 0;
+      totalShipping += item.shippingCharges || 0;
     } else {
-      subtotal = cartData.subtotal;
-    }
-
-    // Razorpay order creation
-    const razorpayOrderOptions = {
-    amount: Math.floor(subtotal * 100), // amount in paise (multiply by 100)
-      currency: "INR",
-      receipt: `receipt_${Date.now()}`,
-      payment_capture: 1, // auto capture payment
-      notes: {
-        userId: userdata._id.toString(),
-        cartId: cartData._id.toString(),
-      },
-    };
-
-    const razorpayOrder = await razorpay.orders.create(razorpayOrderOptions);
-    console.log("Razorpay Order created:", razorpayOrder);
-
-    // Generate your own trackingId (TXN)
+      subtotal = cartData.subtotal; 
+      cartData.items.forEach(item => {
+    totalDiscount += item.discount || 0;
+    totalShipping += item.shippingCharges || 0;
+  });
+    } 
+totalShipping += shippingpayment.shippingCost;
+      const finalSubtotal = subtotal + totalShipping - totalDiscount;
     const TXN = await commonFunction.generateTXNNumber();
 
     // Create your order in DB including razorpayOrderId
@@ -167,15 +192,15 @@ export class OrderController {
         colors: item.colors,
         totalAmount: item.totalAmount,
       })),
-      subtotal: subtotal,
-      tax: tax || 0,
-      shippingCharges: shippingCharges,
-      discount: discount,
-      paymentStatus,
+    subtotal: finalSubtotal,
+      tax: 0,
+      shippingCharges: totalShipping,
+      discount: totalDiscount,
+      paymentStatus:"PENDING",
       paymentMode,
-      orderStatus,
+      orderStatus:"PROCESSING",
       trackingId: TXN,
-      razorpayOrderId: razorpayOrder.id,  // Store razorpay order id here
+      // razorpayOrderId: razorpayOrder.id,  // Store razorpay order id here
       deliveryAddress: {
         postalCode: userdata.zipCode,
         country: userdata.country,
@@ -185,7 +210,7 @@ export class OrderController {
         address: userdata.address,
         building: userdata.building,
     },
-    razorpayOrderId: razorpayOrder.id
+   // razorpayOrderId: razorpayOrder.id
     });
 
     return res.json(new response(createOrders, responseMessage.ORDER_CREATED));
@@ -278,7 +303,7 @@ async checkOut(req, res, next) {
 
     // 🔍 Find order by Razorpay Order ID
     const order = await orderModel.findOne({
-      razorpayOrderId: orderId,
+      _id: orderId,
     });
 
     if (!order) {
@@ -320,6 +345,7 @@ async checkOut(req, res, next) {
       callback_url: "https://yourdomain.com/verify-payment", // Replace with your callback handler
       callback_method: "get",
     }); 
+    console.log("paymentLink=======================>>>>>",paymentLink)
     
 
     // 💾 Optional: Save payment link ID
@@ -380,7 +406,8 @@ const orderId = body.payload.order.entity.receipt;
         razorpayPaymentId,        
         razorpay_signature: expectedSig,
         razorpayOrderId:razorpayOrderId,
-        razorpayPaymentId:razorpayPaymentId
+        razorpayPaymentId:razorpayPaymentId,
+        orderStatus:orderStatus.CONFIRMED
       },
       { new: true }
     ); 
@@ -434,3 +461,57 @@ export default new OrderController();
         // await inventoryModel.findByIdAndUpdate(item.inventoryId, {
         //     $inc: { stockAvailable: -diff }
         // });
+
+
+
+//         function getDistanceInKm(lat1, lon1, lat2, lon2) {
+//   const R = 6371; // Earth radius in km
+//   const dLat = deg2rad(lat2 - lat1);
+//   const dLon = deg2rad(lon2 - lon1);
+
+//   const a = 
+//     Math.sin(dLat / 2) ** 2 +
+//     Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+//     Math.sin(dLon / 2) ** 2;
+
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function deg2rad(deg) {
+//   return deg * (Math.PI / 180);
+// }
+
+// // Example user location
+// const userLocation = {
+//   lat: 28.6139,  // Example: New Delhi
+//   lon: 77.2090
+// };
+
+// // Example warehouse locations
+// const warehouses = [
+//   { id: 1, name: "Mumbai Warehouse", lat: 19.0760, lon: 72.8777 },
+//   { id: 2, name: "Delhi Warehouse", lat: 28.7041, lon: 77.1025 },
+//   { id: 3, name: "Bangalore Warehouse", lat: 12.9716, lon: 77.5946 }
+// ];
+
+// // Find nearest warehouse
+// let nearestWarehouse = null;
+// let minDistance = Infinity;
+
+// warehouses.forEach(warehouse => {
+//   const distance = getDistanceInKm(userLocation.lat, userLocation.lon, warehouse.lat, warehouse.lon);
+//   if (distance < minDistance) {
+//     minDistance = distance;
+//     nearestWarehouse = { ...warehouse, distance };
+//   }
+// });
+
+// // Calculate shipping cost (e.g., ₹10 per km, with a minimum of ₹50)
+// const costPerKm = 10;
+// let shippingCost = Math.max(50, Math.round(nearestWarehouse.distance * costPerKm));
+
+// // Output result
+// console.log(`Nearest Warehouse: ${nearestWarehouse.name}`);
+// console.log(`Distance: ${nearestWarehouse.distance.toFixed(2)} km`);
+// console.log(`Shipping Cost: ₹${shippingCost}`);
