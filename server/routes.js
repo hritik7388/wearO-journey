@@ -6,6 +6,7 @@ import warehouse from "./api/v1/controller/warehouse/routes.js";
 import inventory from "./api/v1/controller/inventory/routes.js";
 import cart from "./api/v1/controller/cart/routes.js";
 import order from "./api/v1/controller/orders/routes.js";
+import subscription from './api/v1/controller/subscription/routes.js'
 /**
  *
  *
@@ -21,6 +22,7 @@ export default function routes(app) {
     app.use("/api/v1/inventory", inventory);
     app.use("/api/v1/cart", cart);
     app.use("/api/v1/order", order);
+    app.use("/api/v1/subscription",subscription)
 
     return app;
 }

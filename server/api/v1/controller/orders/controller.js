@@ -367,55 +367,56 @@ async checkOut(req, res, next) {
   }
 }
 
-
 async razorpayWebhook(req, res) {
   const secret = "hb@123";
   const receivedSig = req.headers['x-razorpay-signature'];
-  const body = req.body; 
-  console.log("body=====================>>>>",body.payload.order)
-    console.log("body=====================>>>>",body.payload.payment)
-      // console.log("body=====================>>>>",body.payload.order)
-  
+  const body = req.body;
+
   const expectedSig = crypto
-  .createHmac("sha256", secret)
-  .update(JSON.stringify(body))
-  .digest("hex");
-  
-  console.log("🧮 Expected Signature:", expectedSig);
-  
-  if (expectedSig !== receivedSig) { 
+    .createHmac("sha256", secret)
+    .update(JSON.stringify(body))
+    .digest("hex");
+
+  if (expectedSig !== receivedSig) {
     return res.status(400).send("Invalid signature");
-  } ;
+  }
 
-const orderId = body.payload.order.entity.receipt;
-  console.log("orderId========::>>>>>>",orderId)
-
-  // Process the webhook event
+  const orderId = body.payload.order.entity.receipt;
   const razorpayOrderId = body.payload.payment.entity.order_id;
   const razorpayPaymentId = body.payload.payment.entity.id;
-  
-  console.log("🔐 Received Signature:", receivedSig); 
-  console.log("📌 Razorpay Order ID:", razorpayOrderId);
-  console.log("💳 Razorpay Payment ID:", razorpayPaymentId);
 
   try {
-    const updatedOrder = await orderModel.findOneAndUpdate(
-      { _id :orderId},
+    // 1. Find the existing order
+    const existingOrder = await orderModel.findById(orderId);
+    if (!existingOrder) {
+      return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    // 2. Reduce inventory for each item
+    const items = existingOrder.items || [];
+    for (const item of items) {
+      const { inventoryId, quantity } = item;
+      await inventoryModel.findByIdAndUpdate(inventoryId, {
+        $inc: { stockAvailable: -quantity }
+      });
+    }
+
+    // 3. Update Order as Paid
+    const updatedOrder = await orderModel.findByIdAndUpdate(
+      orderId,
       {
         paymentStatus: "PAID",
-        razorpayPaymentId,        
         razorpay_signature: expectedSig,
-        razorpayOrderId:razorpayOrderId,
-        razorpayPaymentId:razorpayPaymentId,
-        orderStatus:orderStatus.CONFIRMED
+        razorpayOrderId,
+        razorpayPaymentId,
+        orderStatus: orderStatus.CONFIRMED
       },
       { new: true }
-    ); 
-    console.log("updatedOrder=======================================>>>>",updatedOrder)
+    );
 
     res.status(200).json({
       success: true,
-      message: "Payment verified successfully",
+      message: "Payment verified and inventory updated successfully",
       data: {
         updatedOrder,
         razorpay_order_id: razorpayOrderId,
@@ -423,7 +424,7 @@ const orderId = body.payload.order.entity.receipt;
       }
     });
   } catch (err) {
-    console.error("❗ Error updating order:", err);
+    console.error("❗ Error:", err);
     res.status(500).json({
       success: false,
       message: "Internal server error"
@@ -439,9 +440,7 @@ export default new OrderController();
 // Key ID:rzp_test_XOIXzlbvgcWlzr
 // Key Secret:
 
-// await inventoryModel.findByIdAndUpdate(inventoryId, {
-//     $inc: { stockAvailable: -quantity },
-// });
+
 
   // Restore stock for the removed quantity
             // await inventoryModel.findByIdAndUpdate(item.inventoryId, {
@@ -463,55 +462,3 @@ export default new OrderController();
         // });
 
 
-
-//         function getDistanceInKm(lat1, lon1, lat2, lon2) {
-//   const R = 6371; // Earth radius in km
-//   const dLat = deg2rad(lat2 - lat1);
-//   const dLon = deg2rad(lon2 - lon1);
-
-//   const a = 
-//     Math.sin(dLat / 2) ** 2 +
-//     Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-//     Math.sin(dLon / 2) ** 2;
-
-//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-//   return R * c;
-// }
-
-// function deg2rad(deg) {
-//   return deg * (Math.PI / 180);
-// }
-
-// // Example user location
-// const userLocation = {
-//   lat: 28.6139,  // Example: New Delhi
-//   lon: 77.2090
-// };
-
-// // Example warehouse locations
-// const warehouses = [
-//   { id: 1, name: "Mumbai Warehouse", lat: 19.0760, lon: 72.8777 },
-//   { id: 2, name: "Delhi Warehouse", lat: 28.7041, lon: 77.1025 },
-//   { id: 3, name: "Bangalore Warehouse", lat: 12.9716, lon: 77.5946 }
-// ];
-
-// // Find nearest warehouse
-// let nearestWarehouse = null;
-// let minDistance = Infinity;
-
-// warehouses.forEach(warehouse => {
-//   const distance = getDistanceInKm(userLocation.lat, userLocation.lon, warehouse.lat, warehouse.lon);
-//   if (distance < minDistance) {
-//     minDistance = distance;
-//     nearestWarehouse = { ...warehouse, distance };
-//   }
-// });
-
-// // Calculate shipping cost (e.g., ₹10 per km, with a minimum of ₹50)
-// const costPerKm = 10;
-// let shippingCost = Math.max(50, Math.round(nearestWarehouse.distance * costPerKm));
-
-// // Output result
-// console.log(`Nearest Warehouse: ${nearestWarehouse.name}`);
-// console.log(`Distance: ${nearestWarehouse.distance.toFixed(2)} km`);
-// console.log(`Shipping Cost: ₹${shippingCost}`);

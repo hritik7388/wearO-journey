@@ -502,7 +502,7 @@ module.exports = {
         return await transporter.sendMail(mailOptions);
     },
     
- getNearestWarehouseAndShippingCost(userLocation, warehouses) {
+getNearestWarehouseAndShippingCost(userLocation, warehouses) {
   function deg2rad(deg) {
     return deg * (Math.PI / 180);
   }
@@ -539,7 +539,9 @@ module.exports = {
   });
 
   const costPerKm = 10;
-  const shippingCost = Math.max(50, Math.round(nearestWarehouse.distance * costPerKm));
+  const calculatedCost = Math.round(nearestWarehouse.distance * costPerKm);
+  const shippingCost = Math.min(80, Math.max(30, calculatedCost));
+
 
   return {
     nearestWarehouse,
