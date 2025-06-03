@@ -11,6 +11,7 @@ import inventoryModel from "../../../../models/invetoryModel";
 import responseMessage from "../../../../../assets/responseMessage";
 import cartModel from "../../../../models/cartModel";
 import orderModel from "../../../../models/orderModel";
+import paymentModel from "../../../../models/paymentModel";
 import orderStatus from "../../../../enum/orderStatus";
 import {items} from "joi/lib/types/array";
 const Razorpay = require("razorpay");
@@ -413,6 +414,18 @@ async razorpayWebhook(req, res) {
       },
       { new: true }
     );
+    const paymentData = {
+      userId: existingOrder.userId || null,
+      cartId: existingOrder.cartId || null,
+      paymentStatus: "PAID",
+      paymentMode: "ONLINE",
+      orderStatus: orderStatus.CONFIRMED,
+      razorpay_signature: expectedSig,
+      razorpayOrderId,
+      razorpayPaymentId,
+    };
+
+    await paymentModel.create(paymentData);
 
     res.status(200).json({
       success: true,
@@ -437,8 +450,7 @@ async razorpayWebhook(req, res) {
 export default new OrderController();
 
 
-// Key ID:rzp_test_XOIXzlbvgcWlzr
-// Key Secret:
+ 
 
 
 
