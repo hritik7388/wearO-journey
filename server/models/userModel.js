@@ -98,8 +98,8 @@ module.exports = Mongoose.model("user", userModel);
                     coordinates: [77.3706, 28.5774], // [longitude, latitude] as per GeoJSON
                 },
                 notificationEnable: true,
-                deviceToken: "deviceToken",
-                deviceType: "deviceType",
+                deviceToken: "eNA_NfzHigzLG3WM3jMJba:APA91bFKWW07mjI8GHXlYOwWr323DRU76EI_ufBWbl2-NACWSFV2yiQH28Xd96hPgVcKHmyh4O2oSNWDk3mrXrom8b0SKPPMUQAyFg3HJSw-ugU1oOfaxEY",
+                deviceType: "android",
                 profilePic:
                     "https://img.freepik.com/premium-vector/vector-flat-illustration-software-developer-cyber-program-security_776789-211.jpg",
                 coverImage:
