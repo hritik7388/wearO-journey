@@ -13,6 +13,11 @@ const paymentSchema = new Schema(
             ref: "user",
             required: false,
         },
+        orderId:{
+            type: Schema.Types.ObjectId,
+            ref: "order",
+            required: false,
+        },
         cartId: {
             type: Schema.Types.ObjectId,
             ref: "cart",
