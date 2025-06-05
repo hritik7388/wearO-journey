@@ -10,6 +10,14 @@ import swaggerJSDoc from "swagger-jsdoc";
 import apiErrorHandler from "../helper/apiErrorHandler";
 import dotenv from "dotenv";
 import orderRoutes from '../routes';
+import orderStatus from "../enum/orderStatus";
+const { CronJob } = require('cron');
+const Razorpay = require("razorpay");
+const crypto = require("crypto");
+const razorpay = new Razorpay({
+    key_id: "rzp_test_XOIXzlbvgcWlzr",
+    key_secret: "7FMO9e0hA3CMwofq0CxBi92q",
+});
 
 dotenv.config();
 const app = new express();
@@ -89,6 +97,49 @@ class ExpressServer {
           throw error;
       }
   }
+
+
+    startPaymentFallbackCron() {
+        const job = new CronJob('* * * * * *', async () => {
+            console.log("🕒 Running payment fallback cron every 1 sec...");
+
+            const pendingPayments = await paymentModel.find({ paymentStatus: "PENDING" ,orderStatus:""});
+
+            for (const payment of pendingPayments) {
+                try {
+                    const paymentId = payment.razorpayPaymentId;
+                    const razorpayPayment = await razorpay.payments.fetch(paymentId);
+
+                    if (razorpayPayment.status !== "captured") {
+                        console.log(`⛔ Payment ${paymentId} not captured. Reverting...`);
+
+                        const order = await orderModel.findById(payment.orderId);
+                        if (order && order.items) {
+                            for (const item of order.items) {
+                                await inventoryModel.findByIdAndUpdate(item.inventoryId, {
+                                    $inc: { stockAvailable: item.quantity },
+                                });
+                            }
+                        }
+
+                        await orderModel.findByIdAndUpdate(payment.orderId, {
+                            orderStatus: "CANCELLED",
+                        });
+
+                        await paymentModel.findByIdAndUpdate(payment._id, {
+                            paymentStatus: "FAILED",
+                        });
+
+                        console.log(`✅ Order ${payment.orderId} cancelled and stock restored.`);
+                    } else {
+                        console.log(`✅ Payment ${paymentId} already captured.`);
+                    }
+                } catch (err) {
+                    console.error(`❌ Error processing payment ID ${payment.razorpayPaymentId}`, err.message);
+                }
+            }
+        });
+    }
 
     listen(port) {
         server.listen(port, () => {
