@@ -219,29 +219,29 @@ module.exports = {
     //   });
     // },
 
-    // pushNotificationDelhi: (deviceToken, title, body, callback) => {
-    //   var message = {
-    //     to: deviceToken, // required fill with device token or topics
-    //     content_available: true,
-    //     notification: {
-    //       title: title,
-    //       body: body,
-    //     },
-    //     data: {
-    //       title: title,
-    //       body: body,
-    //     },
-    //   };
-    //   fcm.send(message, function (err, response) {
-    //     if (err) {
-    //       console.log("err", err);
-    //       callback(err, null);
-    //     } else {
-    //       console.log("response", response);
-    //       callback(null, response);
-    //     }
-    //   });
-    // },
+    pushNotificationDelhi: (deviceToken, title, body, callback) => {
+      var message = {
+        to: deviceToken, // required fill with device token or topics
+        content_available: true,
+        notification: {
+          title: title,
+          body: body,
+        },
+        data: {
+          title: title,
+          body: body,
+        },
+      };
+      fcm.send(message, function (err, response) {
+        if (err) {
+          console.log("err", err);
+          callback(err, null);
+        } else {
+          console.log("response", response);
+          callback(null, response);
+        }
+      });
+    },
 
     // ************************************ MAIL FUNCTIONALITY WITH NodeMailer *****************************************************/
 

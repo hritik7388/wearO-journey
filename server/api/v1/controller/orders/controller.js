@@ -360,6 +360,7 @@ export class OrderController {
         }
 
         const orderId = body.payload.order.entity.receipt;
+        console.log("orderId=============================>>>>>",orderId)
         const razorpayOrderId = body.payload.payment.entity.order_id;
         const razorpayPaymentId = body.payload.payment.entity.id;
 
@@ -389,7 +390,7 @@ export class OrderController {
             const paymentData = {
                 userId: existingOrder.userId || null,
                 cartId: existingOrder.cartId || null,
-                orderId:existingOrder.orderId|| null,
+                orderId:orderId,
                 paymentStatus: "PAID",
                 paymentMode: "ONLINE",
                 orderStatus: orderStatus.CONFIRMED,

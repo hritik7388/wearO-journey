@@ -117,7 +117,7 @@ setupCronJobs() {
             try {
                 const paymentId = payment.razorpayPaymentId; // Razorpay payment ID
                 const dbPaymentId = payment._id; // MongoDB Payment _id
-                const orderId = pendingPayments.orderId;
+                const orderId = payment.orderId;
 
                 console.log("MongoDB paymentId====================>>>>", dbPaymentId);
                 console.log("Razorpay paymentId====================>>>>", paymentId);
@@ -128,7 +128,7 @@ setupCronJobs() {
                 if (razorpayPayment.status == "captured") {
                     console.log(`⛔ Payment ${paymentId} not captured. Reverting...`);
 
-                    const order = await orderModel.findById(orderId);
+                    const order = await orderModel.findById(_id);
                     console.log("order=====================>>>>",order)
                     if (order && order.items) {
                         for (const item of order.items) {
