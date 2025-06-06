@@ -389,6 +389,7 @@ export class OrderController {
             const paymentData = {
                 userId: existingOrder.userId || null,
                 cartId: existingOrder.cartId || null,
+                orderId:existingOrder.orderId|| null,
                 paymentStatus: "PAID",
                 paymentMode: "ONLINE",
                 orderStatus: orderStatus.CONFIRMED,

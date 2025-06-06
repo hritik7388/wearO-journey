@@ -8,6 +8,7 @@ import Server from "./common/server";
 
   const server = new Server()
     .router(Routes)
+    .setupCronJobs()
     .configureSwagger(Config.get("swaggerDefinition"))
     .handleError();
 

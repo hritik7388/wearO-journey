@@ -24,22 +24,24 @@ const paymentSchema = new Schema(
             required: false,
         },
 
-        paymentStatus: {
-            type: String,
-            enum: ["PENDING", "PAID", "FAILED", "REFUNDED"],
-            default: "PENDING",
-        },
 
-        paymentMode: {
-            type: String,
-            enum: ["COD", "ONLINE"],
-            required: false,
-        },
-        orderStatus: {
-            type: String,
-            enum: ["PLACED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED", "CONFIRMED"],
-            default: "PROCESSING",
-        },
+    paymentStatus: {
+      type: String,
+      enum: ["PENDING", "PAID", "FAILED", "REFUNDED", "CANCELLED"],
+      default: "PENDING",
+    },
+
+    paymentMode: {
+      type: String,
+      enum: ["COD", "ONLINE"],
+      required: false,
+    },
+
+    orderStatus: {
+      type: String,
+      enum: ["PLACED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED", "CONFIRMED", "FAILED"],
+      default: "PROCESSING",
+    },
         razorpay_signature: {type: String},
         razorpayOrderId: {type: String},
         razorpayPaymentId: {type: String},
