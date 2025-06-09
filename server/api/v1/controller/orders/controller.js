@@ -331,9 +331,20 @@ export class OrderController {
                 callback_url: "https://yourdomain.com/verify-payment",
                 callback_method: "get",
             });
+            console.log("paymentLink==================================>>>>",paymentLink)
 
             order.razorpayPaymentLinkId = paymentLink.id;
             await order.save();
+             // Create payment entry with status PENDING
+        await paymentModel.create({
+            userId: userData._id,
+            cartId: order.cartId || null,
+            orderId: order._id,
+            paymentStatus: "PENDING",
+            paymentMode: order.paymentMode,
+            orderStatus: order.orderStatus,
+            razorpayPaymentLinkId: paymentLink.id,
+        });
             return res.status(200).json({
                 responseCode: 200,
                 responseMessage: "Payment link created successfully",
@@ -387,19 +398,18 @@ export class OrderController {
                 },
                 {new: true}
             );
-            const paymentData = {
-                userId: existingOrder.userId || null,
-                cartId: existingOrder.cartId || null,
-                orderId:orderId,
+      await paymentModel.findOneAndUpdate(
+            { orderId: orderId },
+            {
                 paymentStatus: "PAID",
                 paymentMode: "ONLINE",
                 orderStatus: orderStatus.CONFIRMED,
                 razorpay_signature: expectedSig,
                 razorpayOrderId,
                 razorpayPaymentId,
-            };
-
-            await paymentModel.create(paymentData);
+            },
+            { new: true }
+        );
 
             res.status(200).json({
                 success: true,
