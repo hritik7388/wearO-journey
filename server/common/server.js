@@ -10,6 +10,8 @@ import swaggerJSDoc from "swagger-jsdoc";
 import apiErrorHandler from "../helper/apiErrorHandler";
 import paymentModel from '../models/paymentModel'
 import orderModel from '../models/orderModel'
+import invetoryModel from "../models/invetoryModel";
+import cartModel from '../models/cartModel'
 import dotenv from "dotenv";
 import orderRoutes from '../routes';
 import orderStatus from "../enum/orderStatus";
@@ -99,112 +101,80 @@ class ExpressServer {
           throw error;
       }
   }
-
-
 setupCronJobs() {
-    cron.schedule('*/5 * * * * *', async () => {
-        console.log('⏰ Cron job is running every minute at', new Date().toLocaleString());
+  const cron = require('node-cron');
 
-        const pendingPayments = await paymentModel.find({
-            paymentStatus: "PENDING",
-            orderStatus: "PROCESSING",
-            paymentMode: "ONLINE"
-        });
+  cron.schedule('*/5 * * * * *', async () => {
+    try {
+      console.log('⏰ Cron job is running at', new Date().toLocaleString());
 
-        console.log("pendingPayments=======================>>>>>", pendingPayments);
+      const paymentData = await paymentModel.find({
+        orderStatus: "PROCESSING",
+        paymentMode: "ONLINE",
+        paymentStatus: "PENDING"
+      });
 
-        for (const payment of pendingPayments) {
-            try {
-                const paymentId = payment.razorpayPaymentId; // Razorpay payment ID
-                const dbPaymentId = payment._id; // MongoDB Payment _id
-                const orderId = payment.orderId;
+      console.log("paymentData ======>>>>", paymentData);
 
-                console.log("MongoDB paymentId====================>>>>", dbPaymentId);
-                console.log("Razorpay paymentId====================>>>>", paymentId);
+      for (const payment of paymentData) {
+        const orderData = await orderModel.findOne({ _id: payment.orderId });
 
-                const razorpayPayment = await razorpay.payments.fetch(paymentId);
-                console.log("razorpayPayment==================>>>>>", razorpayPayment);
-
-                if (razorpayPayment.status == "captured") {
-                    console.log(`⛔ Payment ${paymentId} not captured. Reverting...`);
-
-                    const order = await orderModel.findById(_id);
-                    console.log("order=====================>>>>",order)
-                    if (order && order.items) {
-                        for (const item of order.items) {
-                            await inventoryModel.findByIdAndUpdate(item.inventoryId, {
-                                $inc: { stockAvailable: item.quantity },
-                            });
-                        }
-                    }
-
-                    await orderModel.findByIdAndUpdate(orderId, {
-                        orderStatus: "CANCELLED",
-                    });
-
-                    await paymentModel.findByIdAndUpdate(dbPaymentId, {
-                        paymentStatus: "FAILED",
-                    });
-
-                    await orderModel.findByIdAndDelete(orderId);
-                    await paymentModel.findByIdAndDelete(dbPaymentId);
-
-                    console.log(`✅ Order ${orderId} cancelled, stock restored, and records deleted.`);
-                } else {
-                    console.log(`✅ Payment ${paymentId} not  captured.`);
-                }
-            } catch (err) {
-                console.error(`❌ Error processing payment ID ${payment.razorpayPaymentId}`, err.message);
-            }
+        if (!orderData) {
+          console.warn(`❗ Order not found for orderId: ${payment.orderId}`);
+          continue;
         }
-    });
 
-    console.log('✅ Cron job scheduled...');
-    return this;
+        const cartData = orderData.cartId
+          ? await cartModel.findOne({ _id: orderData.cartId })
+          : null;
+
+        // ✅ Restore inventory from cart
+        if (cartData && Array.isArray(cartData.items)) {
+          for (const cartItem of cartData.items) {
+            if (cartItem.inventoryId && cartItem.quantity) {
+              const inventory = await invetoryModel.findOne({ _id: cartItem.inventoryId });
+              if (inventory) {
+                inventory.stockAvailable += cartItem.quantity;
+                await inventory.save();
+                console.log(`✅ Restored ${cartItem.quantity} units to inventoryId: ${cartItem.inventoryId}`);
+              }
+            }
+          }
+        }
+              // ✅ Refund the amount via Razorpay
+        if (payment.razorpayPaymentId) {
+          try {
+            await commonFunction.refund(payment.razorpayPaymentId);
+          } catch (refundErr) {
+            console.error(`❌ Refund process failed for ${payment.razorpayPaymentId}`);
+          }
+        }
+
+        // ✅ Update payment status
+        await paymentModel.updateOne(
+          { _id: payment._id },
+          {
+            $set: {
+              orderStatus: "FAILED",
+              paymentStatus: "FAILED"
+            }
+          }
+        );
+        console.log(`📝 Payment status updated to FAILED for paymentId: ${payment._id}`);
+
+        // ✅ Delete the order
+        await orderModel.deleteOne({ _id: orderData._id });
+        console.log(`🗑️ Deleted orderId: ${orderData._id}`);
+      }
+    } catch (err) {
+      console.error("❌ Error in cron job:", err);
+    }
+  });
+
+  console.log('✅ Cron job scheduled...');
+  return this;
 }
 
-
-    // startPaymentFallbackCron() {
-    //     const job = new CronJob('* * * * * *', async () => {
-    //         console.log("🕒 Running payment fallback cron every 1 sec...");
-
-            
-
-    //         for (const payment of pendingPayments) {
-    //             try {
-    //                 const paymentId = payment.razorpayPaymentId;
-    //                 const razorpayPayment = await razorpay.payments.fetch(paymentId);
-
-    //                 if (razorpayPayment.status !== "captured") {
-    //                     console.log(`⛔ Payment ${paymentId} not captured. Reverting...`);
-
-    //                     const order = await orderModel.findById(payment.orderId);
-    //                     if (order && order.items) {
-    //                         for (const item of order.items) {
-    //                             await inventoryModel.findByIdAndUpdate(item.inventoryId, {
-    //                                 $inc: { stockAvailable: item.quantity },
-    //                             });
-    //                         }
-    //                     }
-
-    //                     await orderModel.findByIdAndUpdate(payment.orderId, {
-    //                         orderStatus: "CANCELLED",
-    //                     });
-
-    //                     await paymentModel.findByIdAndUpdate(payment._id, {
-    //                         paymentStatus: "FAILED",
-    //                     });
-
-    //                     console.log(`✅ Order ${payment.orderId} cancelled and stock restored.`);
-    //                 } else {
-    //                     console.log(`✅ Payment ${paymentId} already captured.`);
-    //                 }
-    //             } catch (err) {
-    //                 console.error(`❌ Error processing payment ID ${payment.razorpayPaymentId}`, err.message);
-    //             }
-    //         }
-    //     });
-    // }
 
     listen(port) {
         server.listen(port, () => {

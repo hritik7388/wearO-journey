@@ -427,6 +427,39 @@ module.exports = {
         return await transporter.sendMail(mailOptions);
     },
 
+     refundRazorpayPayment : async (paymentId, amount = null) => {
+    try {
+        const key = config.get("razorpay.key");
+        const secret = config.get("razorpay.secret");
+
+        const authToken = Buffer.from(`${key}:${secret}`).toString("base64");
+
+        let payload = {};
+        if (amount) {
+            payload.amount = amount; // in paise, e.g., 1000 = ₹10.00
+        }
+
+        const response = await axios.post(
+            `https://api.razorpay.com/v1/payments/${paymentId}/refund`,
+            payload,
+            {
+                headers: {
+                    Authorization: `Basic ${authToken}`,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+
+        console.log(`💸 Refund successful for paymentId: ${paymentId}`);
+        return response.data;
+    } catch (err) {
+       console.error(
+  `❌ Refund failed for paymentId: ${paymentId}`,
+  (err.response && err.response.data) ? err.response.data : err.message
+);
+        throw err;
+    }
+},
     sendMailExchangeAccept: async (email, body) => {
         let html = mailTemplet.mailExchangeAcceptTemplet(body);
         let subject = "EXCHANGE STATUS";
