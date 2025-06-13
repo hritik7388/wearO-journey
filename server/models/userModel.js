@@ -66,19 +66,19 @@ const userModel = new Schema(
 referredBy: {
   type: {
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true
     },
     referralCode: {
       type: String,
-      required: true
+      required: false
     }
   },
   default: null
 },
   referredUsers: [{
-    type: mongoose.Schema.Types.ObjectId,
+    type: Mongoose.Schema.Types.ObjectId,
     ref: 'User'// people save who will use this user code 
   }], 
   rewards: {
