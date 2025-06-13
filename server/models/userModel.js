@@ -59,7 +59,33 @@ const userModel = new Schema(
             type: String,
             enum: [status.ACTIVE, status.BLOCKED, status.DELETED],
             default: status.ACTIVE,
-        },
+        },  referralCode: {
+    type: String,
+    unique: true
+  }, 
+referredBy: {
+  type: {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    referralCode: {
+      type: String,
+      required: true
+    }
+  },
+  default: null
+},
+  referredUsers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'// people save who will use this user code 
+  }], 
+  rewards: {
+    type: Number,
+    default: 0
+  },
+
         deviceToken: {type: String},
         deviceType: {type: String},
     },
