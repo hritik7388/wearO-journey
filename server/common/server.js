@@ -103,22 +103,26 @@ class ExpressServer {
   }
 setupCronJobs() {
   const cron = require('node-cron');
+  const moment = require('moment'); // Make sure to install moment or use native Date
 
   cron.schedule('*/5 * * * * *', async () => {
     try {
       console.log('⏰ Cron job is running at', new Date().toLocaleString());
 
+      const oneMinuteAgo = moment().subtract(2, 'minutes').toDate();
+      const twoMinutesAgo = moment().subtract(1, 'minutes').toDate();
+
       const paymentData = await paymentModel.find({
         orderStatus: "PROCESSING",
         paymentMode: "ONLINE",
-        paymentStatus: "PENDING"
+        paymentStatus: "PENDING",
+        createdAt: { $gte: oneMinuteAgo, $lte: twoMinutesAgo } // Between 1–2 minutes ago
       });
 
-      console.log("paymentData ======>>>>", paymentData);
+      console.log("🎯 Matching payments:", paymentData.length);
 
       for (const payment of paymentData) {
         const orderData = await orderModel.findOne({ _id: payment.orderId });
-
         if (!orderData) {
           console.warn(`❗ Order not found for orderId: ${payment.orderId}`);
           continue;
@@ -128,8 +132,8 @@ setupCronJobs() {
           ? await cartModel.findOne({ _id: orderData.cartId })
           : null;
 
-        // ✅ Restore inventory from cart
-        if (cartData && Array.isArray(cartData.items)) {
+        // ✅ Restore inventory
+        if (cartData && cartData.items && cartData.items.length){
           for (const cartItem of cartData.items) {
             if (cartItem.inventoryId && cartItem.quantity) {
               const inventory = await invetoryModel.findOne({ _id: cartItem.inventoryId });
@@ -141,30 +145,30 @@ setupCronJobs() {
             }
           }
         }
-              // ✅ Refund the amount via Razorpay
+
+        let isRefunded = false;
+
         if (payment.razorpayPaymentId) {
           try {
             await commonFunction.refund(payment.razorpayPaymentId);
+            isRefunded = true;
+            console.log(`✅ Refund success for paymentId: ${payment.razorpayPaymentId}`);
           } catch (refundErr) {
-            console.error(`❌ Refund process failed for ${payment.razorpayPaymentId}`);
+            console.error(`❌ Refund failed for ${payment.razorpayPaymentId}`);
           }
         }
 
-        // ✅ Update payment status
-        await paymentModel.updateOne(
-          { _id: payment._id },
-          {
-            $set: {
-              orderStatus: "FAILED",
-              paymentStatus: "FAILED"
-            }
-          }
-        );
-        console.log(`📝 Payment status updated to FAILED for paymentId: ${payment._id}`);
+        // ✅ Only update status and delete order if refund was successful
+        if (isRefunded) {
+          await paymentModel.updateOne(
+            { _id: payment._id },
+            { $set: { orderStatus: "FAILED", paymentStatus: "FAILED" } }
+          );
+          console.log(`📝 Payment status updated to FAILED for paymentId: ${payment._id}`);
 
-        // ✅ Delete the order
-        await orderModel.deleteOne({ _id: orderData._id });
-        console.log(`🗑️ Deleted orderId: ${orderData._id}`);
+          await orderModel.deleteOne({ _id: orderData._id });
+          console.log(`🗑️ Deleted orderId: ${orderData._id}`);
+        }
       }
     } catch (err) {
       console.error("❌ Error in cron job:", err);
@@ -174,6 +178,7 @@ setupCronJobs() {
   console.log('✅ Cron job scheduled...');
   return this;
 }
+
 
 
     listen(port) {
