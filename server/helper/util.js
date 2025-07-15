@@ -1,49 +1,11 @@
 import config from "config";
 import jwt from "jsonwebtoken";
-const fs = require("fs");
-import FCM from "fcm-push";
-import AWS from "aws-sdk";
-import ses from "node-ses";
-// import mailTemplet from "../helper/mailtemplet";
-const Sender = require("aws-sms-send");
+const fs = require("fs");const admin = require("firebase-admin");
+const serviceAccount = require("../../config/firebaseAdmin.json");
 
-import cloudinary from "cloudinary";
-import nodemailer from "nodemailer";
-
-// const accountSid = config.get("twilio.accountSid");
-// const authToken = config.get("twilio.authToken");
-// const client = require("twilio")(accountSid, authToken);
-
-// cloudinary.config({
-//   cloud_name: config.get('cloudinary.cloud_name'),
-//   api_key: config.get('cloudinary.api_key'),
-//   api_secret: config.get('cloudinary.api_secret')
-// });
-
-// const s3 = new AWS.S3({
-//   accessKeyId: config.get("AWS.accessKeyId"),
-//   secretAccessKey: config.get("AWS.secretAccessKey"),
-// });
-
-// AWS.config.update({
-//   accessKeyId: config.get("AWS.accessKeyId"),
-//   secretAccessKey: config.get("AWS.secretAccessKey"),
-//   region: 'ap-south-1',
-//   // region: config.get("AWS.region"),
-
-// });
-// const sns = new AWS.SNS();
-
-// AWS.config.update({ region:"ap-south-1"});
-// const sns = new AWS.SNS({
-// accessKeyId: config.get("AWS.accessKeyId"),
-// secretAccessKey: config.get("AWS.secretAccessKey"),
-// region: config.get("AWS.region"),
-// });
-
-// const serverKey = config.get("pushNotificationServerkey");
-// const fcm = new FCM(serverKey);
-
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+}); 
 module.exports = {
     getOTP() {
         var otp = Math.floor(100000 + Math.random() * 900000);
@@ -219,29 +181,29 @@ module.exports = {
     //   });
     // },
 
-    pushNotificationDelhi: (deviceToken, title, body, callback) => {
-      var message = {
-        to: deviceToken, // required fill with device token or topics
-        content_available: true,
-        notification: {
-          title: title,
-          body: body,
-        },
-        data: {
-          title: title,
-          body: body,
-        },
-      };
-      fcm.send(message, function (err, response) {
-        if (err) {
-          console.log("err", err);
-          callback(err, null);
-        } else {
-          console.log("response", response);
-          callback(null, response);
-        }
-      });
-    },
+  pushNotificationDelhi: async (deviceToken, title, body) => {
+    const message = {
+      token: deviceToken,
+      notification: {
+        title,
+        body,
+      },
+      data: {
+        title,
+        body,
+      },
+    };
+
+    try {
+      console.log("Push Notification - Message:", message);
+      const response = await admin.messaging().send(message);
+      console.log("✅ FCM Response:", response);
+      return response;
+    } catch (error) {
+      console.error("❌ FCM Error:", error);
+      throw error;
+    }
+  },
 
     // ************************************ MAIL FUNCTIONALITY WITH NodeMailer *****************************************************/
 
@@ -584,3 +546,8 @@ getNearestWarehouseAndShippingCost(userLocation, warehouses) {
 }
 
 };
+
+
+
+
+ 
