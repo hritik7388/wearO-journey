@@ -882,8 +882,7 @@ async forgotPassword(req, res, next) {
         };
         try {
             const validatedBody = await Joi.validate(req.query, validationSchema);
-            const {_id} = validatedBody;
-            console.log("validatedBody==>>", validatedBody);
+             
 
             const userResult = await findUser({
                 _id: req.userId,
@@ -1044,7 +1043,7 @@ async forgotPassword(req, res, next) {
                 throw apiError.notFound(responseMessage.USER_NOT_FOUND);
             }
             return res.json(new response(dataResults, responseMessage.DATA_FOUND));
-            console.log();
+         
         } catch (error) {
             console.log("error===>>>>", error);
             return next(error);
@@ -1166,5 +1165,5 @@ async forgotPassword(req, res, next) {
         }
     }
 }
-export default new adminController();
+export default new AdminController();
 //work on progress
