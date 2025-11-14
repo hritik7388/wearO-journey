@@ -199,62 +199,54 @@ export class AdminController {
      *         description: Returns user details and authentication token upon successful OTP verification
      */
     async verifyOtp(req, res, next) {
-        const validationSchema = {
-            email: Joi.string().required(),
-            otp: Joi.number().required(),
-        };
-        try {
-            const validatedBody = await Joi.validate(req.body, validationSchema);
-            const {email, otp} = validatedBody;
-            const userData = await userModel.findOne({
-                email: email,
-                userType: userType.ADMIN,
-                status: {
-                    $ne: status.DELETE,
-                },
-            });
-            if (!userData) {
-                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
-            }
-            if (new Date().getTime() > userData.otpExpTime) {
-                throw apiError.badRequest(responseMessage.OTP_EXPIRED);
-            }
-            if (userData.otp !== validatedBody.otp) {
-                throw apiError.badRequest(responseMessage.INVALID_OTP);
-            }
-            const upadteUser = await userModel.findByIdAndUpdate(
-                {
-                    _id: userData._id,
-                },
-                {
-                    $set: {
-                        otpVerification: true,
-                        otp: null,
-                        otpExpTime: null,
-                    },
-                },
-                {new: true}
-            );
+        const validationSchema = Joi.object({
+    email: Joi.string().email().required(),
+    otp: Joi.number().required(),
+});
 
-            var token = await commonFunction.getToken({
-                id: upadteUser._id,
-                email: upadteUser.email,
-                mobileNumber: upadteUser.mobileNumber,
-                userType: upadteUser.userType,
-            });
-            console.log("token=================>>>>", token);
-            var userInfo = {
-                _id: upadteUser._id,
-                email: upadteUser.email,
-                token: token,
-                otpVerification: upadteUser.otpVerification,
-                status: upadteUser.status,
-            };
-            return res.json(new response(userInfo, responseMessage.OTP_VERIFIED));
-        } catch (error) {
-            console.error("Error during OTP verification:======>>>>>>", error);
-            return next(error);
-        }
+try {
+    const validatedBody = await validationSchema.validateAsync(req.body);
+    const { email } = validatedBody;
+
+    const userData = await userModel.findOne({
+        email,
+        userType: userType.ADMIN,
+        status: { $ne: status.DELETE },
+    });
+
+    if (!userData) throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+
+    if (Date.now() > userData.otpExpTime) throw apiError.badRequest(responseMessage.OTP_EXPIRED);
+
+    if (userData.otp !== validatedBody.otp) throw apiError.badRequest(responseMessage.INVALID_OTP);
+
+    const updatedUser = await userModel.findByIdAndUpdate(
+        userData._id,
+        { $set: { otpVerification: true, otp: null, otpExpTime: null } },
+        { new: true }
+    );
+
+    const token = await commonFunction.getToken({
+        id: updatedUser._id,
+        email: updatedUser.email,
+        mobileNumber: updatedUser.mobileNumber,
+        userType: updatedUser.userType,
+    });
+
+    const userInfo = {
+        _id: updatedUser._id,
+        email: updatedUser.email,
+        token,
+        otpVerification: updatedUser.otpVerification,
+        status: updatedUser.status,
+    };
+
+    return res.json(new response(userInfo, responseMessage.OTP_VERIFIED));
+
+} catch (error) {
+    console.error("Error during OTP verification:", error);
+    return next(error);
+}
     }
 
     /**
