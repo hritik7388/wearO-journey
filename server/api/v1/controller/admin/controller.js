@@ -497,40 +497,50 @@ try {
      *       200:
      *         description: Returns success message after initiating the forgot password process
      */
-    async forgotPassword(req, res, next) {
-        var validationSchema = {
-            email: Joi.string().required(),
-        };
-        try {
-            if (req.body.email) {
-                req.body.email = req.body.email.toLowerCase();
-            }
-            var validatedBody = await Joi.validate(req.body, validationSchema);
-            const {email} = validatedBody;
-            var userResult = await userModel.findOne({
-                email: email,
-                status: {$ne: status.DELETE},
-                userType: userType.ADMIN,
-            });
-            if (!userResult) {
-                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
-            } else {
-                var otp = commonFunction.getOTP();
-                var newOtp = otp;
-                var time = Date.now() + 180000;
-                //  await commonFunction.sendMailOtpForgetAndResend(email, otp);
-                var updateResult = await userModel.findByIdAndUpdate(
-                    {_id: userResult._id},
-                    {$set: {otp: newOtp, otpExpTime: time, otpVerification: false}},
-                    {new: true}
-                );
-                return res.json(new response(updateResult, responseMessage.OTP_SENT));
-            }
-        } catch (error) {
-            console.log(error);
-            return next(error);
+async forgotPassword(req, res, next) {
+    const validationSchema = Joi.object({
+        email: Joi.string().email().required(),
+    });
+
+    try {
+        // Normalize email
+        if (req.body.email) {
+            req.body.email = req.body.email.toLowerCase();
         }
+
+        const validatedBody = await validationSchema.validateAsync(req.body);
+        const { email } = validatedBody;
+
+        const userResult = await userModel.findOne({
+            email,
+            status: { $ne: status.DELETE },
+            userType: userType.ADMIN,
+        });
+
+        if (!userResult) {
+            throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+        }
+
+        // Generate secure OTP
+        const otp = commonFunction.getOTP(); // Make sure getOTP uses crypto.randomInt
+        const otpExpTime = Date.now() + 3 * 60 * 1000; // 3 minutes from now
+
+        // Optionally send OTP via email
+        // await commonFunction.sendMailOtpForgetAndResend(email, otp);
+
+        const updateResult = await userModel.findByIdAndUpdate(
+            userResult._id,
+            { $set: { otp, otpExpTime, otpVerification: false } },
+            { new: true }
+        );
+
+        return res.json(new response(updateResult, responseMessage.OTP_SENT));
+    } catch (error) {
+        console.error("Error during forgotPassword:", error);
+        return next(error);
     }
+}
+
 
     /**
      * @swagger
@@ -567,36 +577,45 @@ try {
      *         description: Something went wrong!
      */
     async resetPassword(req, res, next) {
-        const validationSchema = {
-            password: Joi.string().required(),
-            confirmPassword: Joi.string().required(),
-        };
-        try {
-            const {password, confirmPassword} = await Joi.validate(req.body, validationSchema);
-            var userResult = await userModel.findOne({
-                _id: req.userId,
-                status: {$ne: status.DELETE},
-                userType: userType.ADMIN,
-            });
-            if (!userResult) {
-                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
-            } else {
-                if (password == confirmPassword) {
-                    let update = await userModel.findByIdAndUpdate(
-                        {_id: userResult._id},
-                        {password: bcrypt.hashSync(password)},
-                        {new: true}
-                    );
-                    return res.json(new response(update, responseMessage.PASSWORD_RESET_SUCCESS));
-                } else {
-                    throw apiError.notFound(responseMessage.PASSWORD_NOT_MATCH);
-                }
-            }
-        } catch (error) {
-            console.log(error);
-            return next(error);
+    const validationSchema = Joi.object({
+        password: Joi.string().required(),
+        confirmPassword: Joi.string().required(),
+    });
+
+    try {
+        const { password, confirmPassword } = await validationSchema.validateAsync(req.body);
+
+        if (password !== confirmPassword) {
+            throw apiError.badRequest(responseMessage.PASSWORD_NOT_MATCH);
         }
+
+        const userResult = await userModel.findOne({
+            _id: req.userId,
+            status: { $ne: status.DELETE },
+            userType: userType.ADMIN,
+        });
+
+        if (!userResult) {
+            throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+        }
+
+        // Hash password securely
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const updatedUser = await userModel.findByIdAndUpdate(
+            userResult._id,
+            { password: hashedPassword },
+            { new: true }
+        );
+
+        return res.json(new response(updatedUser, responseMessage.PASSWORD_RESET_SUCCESS));
+    } catch (error) {
+        console.error("Error during resetPassword:", error);
+        return next(error);
     }
+}
+
 
     /**
      * @swagger
