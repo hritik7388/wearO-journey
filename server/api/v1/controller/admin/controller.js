@@ -386,134 +386,92 @@ try {
      *       500:
      *         description: Internal server error
      */
-    async updateAdminProfile(req, res, next) {
-        const validationSchema = {
-            fullName: Joi.string().required(),
-            firstName: Joi.string().required(),
-            lastName: Joi.string().required(),
-            email: Joi.string().email().required(),
-            mobileNumber: Joi.string().required(),
-            countryCode: Joi.string().required(),
-            dateOfBirth: Joi.string().required(), // "20/08/2001" format
-            gender: Joi.string().valid("MALE", "FEMALE", "OTHER").required(),
-            password: Joi.string().required(),
-            state: Joi.string().required(),
-            address: Joi.string().required(),
-            streetName: Joi.string().optional(),
-            buildingName: Joi.string().optional(),
-            city: Joi.string().optional(),
-            zipCode: Joi.string().optional(),
-            country: Joi.string().optional(),
-            location: Joi.object({
-                type: Joi.string().valid("Point").required(),
-                coordinates: Joi.array().items(Joi.number()).length(2).required(), // [longitude, latitude]
-            }).required(),
-            profilePic: Joi.string().optional(),
-            coverImage: Joi.string().optional(),
-        };
-        try {
-            console.log("token=================>>>>", req.headers.token);
+   async updateAdminProfile(req, res, next) {
+    const validationSchema = Joi.object({
+        fullName: Joi.string().required(),
+        firstName: Joi.string().required(),
+        lastName: Joi.string().required(),
+        email: Joi.string().email().required(),
+        mobileNumber: Joi.string().required(),
+        countryCode: Joi.string().required(),
+        dateOfBirth: Joi.string().required(),
+        gender: Joi.string().valid("MALE", "FEMALE", "OTHER").required(),
+        password: Joi.string().required(),
+        state: Joi.string().required(),
+        address: Joi.string().required(),
+        streetName: Joi.string().optional(),
+        buildingName: Joi.string().optional(),
+        city: Joi.string().optional(),
+        zipCode: Joi.string().optional(),
+        country: Joi.string().optional(),
+        location: Joi.object({
+            type: Joi.string().valid("Point").required(),
+            coordinates: Joi.array().items(Joi.number()).length(2).required(),
+        }).required(),
+        profilePic: Joi.string().optional(),
+        coverImage: Joi.string().optional(),
+    });
 
-            var validatedBody = await Joi.validate(req.body, validationSchema);
-            const {
-                fullName,
-                firstName,
-                lastName,
-                email,
-                mobileNumber,
-                countryCode,
-                dateOfBirth,
-                gender,
-                password,
-                state,
-                address,
-                location,
-                profilePic,
-                coverImage,
-                streetName,
-                buildingName,
-                city,
-                zipCode,
-                country,
-            } = validatedBody;
-            const userdata = await userModel.findOne({
-                _id: req.userId,
-                userType: userType.ADMIN,
-                status: {
-                    $ne: status.DELETE,
-                },
-            });
-            if (!userdata) {
-                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
-            }
-            if (validatedBody.profilePic) {
-                validatedBody.profilePic = validatedBody.profilePic;
-                validatedBody.profilePic = await commonFunction.getImageUrl(validatedBody.profilePic);
-            }
-            if (validatedBody.mobileNumber) {
-                const checkMobile = await userModel.findOne({
-                    mobileNumber: validatedBody.mobileNumber,
-                    _id: {$ne: req.userId},
-                    userType: userType.ADMIN,
-                    status: {$ne: status.DELETE},
-                });
-                if (checkMobile) {
-                    throw apiError.conflict(responseMessage.MOBILE_ALREADY_IN_USE);
-                }
-            }
-            if (validatedBody.email) {
-                const checkEmail = await userModel.findOne({
-                    email: validatedBody.email,
-                    _id: {$ne: req.userId},
-                    userType: userType.ADMIN,
-                    status: {$ne: status.DELETE},
-                });
-                if (checkEmail) {
-                    throw apiError.conflict(responseMessage.EMAIL_ALREADY_IN_USE);
-                }
-            }
-            if (validatedBody.password) {
-                const salt = await bcrypt.genSalt(10);
-                validatedBody.password = await bcrypt.hash(validatedBody.password, salt);
-            }
-            if (validatedBody.coverImage) {
-                validatedBody.coverImage = await commonFunction.getImageUrl(validatedBody.coverImage);
-            }
-            const updateUser = await userModel.findByIdAndUpdate(
-                {
-                    _id: req.userId,
-                },
-                {
-                    $set: {
-                        fullName: validatedBody.fullName,
-                        firstName: validatedBody.firstName,
-                        lastName: validatedBody.lastName,
-                        email: validatedBody.email,
-                        mobileNumber: validatedBody.mobileNumber,
-                        countryCode: validatedBody.countryCode,
-                        dateOfBirth: validatedBody.dateOfBirth,
-                        gender: validatedBody.gender,
-                        password: validatedBody.password,
-                        state: validatedBody.state,
-                        address: validatedBody.address,
-                        location: validatedBody.location,
-                        profilePic: validatedBody.profilePic,
-                        coverImage: validatedBody.coverImage,
-                        streetName: validatedBody.streetName,
-                        buildingName: validatedBody.buildingName,
-                        city: validatedBody.city,
-                        zipCode: validatedBody.zipCode,
-                        country: validatedBody.country,
-                    },
-                },
-                {new: true}
-            );
-            return res.json(new response(updateUser, responseMessage.PROFILE_UPDATED));
-        } catch (error) {
-            console.error("Error during profile update:======>>>>>>", error);
-            return next(error);
+    try {
+        const validatedBody = await validationSchema.validateAsync(req.body); // ✅ Use const & validateAsync
+
+        const userData = await userModel.findOne({
+            _id: req.userId,
+            userType: userType.ADMIN,
+            status: { $ne: status.DELETE },
+        });
+        if (!userData) throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+
+        // Process images
+        if (validatedBody.profilePic) {
+            validatedBody.profilePic = await commonFunction.getImageUrl(validatedBody.profilePic);
         }
+        if (validatedBody.coverImage) {
+            validatedBody.coverImage = await commonFunction.getImageUrl(validatedBody.coverImage);
+        }
+
+        // Check unique mobile
+        if (validatedBody.mobileNumber) {
+            const existingMobile = await userModel.findOne({
+                mobileNumber: validatedBody.mobileNumber,
+                _id: { $ne: req.userId },
+                userType: userType.ADMIN,
+                status: { $ne: status.DELETE },
+            });
+            if (existingMobile) throw apiError.conflict(responseMessage.MOBILE_ALREADY_IN_USE);
+        }
+
+        // Check unique email
+        if (validatedBody.email) {
+            const existingEmail = await userModel.findOne({
+                email: validatedBody.email,
+                _id: { $ne: req.userId },
+                userType: userType.ADMIN,
+                status: { $ne: status.DELETE },
+            });
+            if (existingEmail) throw apiError.conflict(responseMessage.EMAIL_ALREADY_IN_USE);
+        }
+
+        // Hash password if provided
+        if (validatedBody.password) {
+            const salt = await bcrypt.genSalt(10);
+            validatedBody.password = await bcrypt.hash(validatedBody.password, salt);
+        }
+
+        // Update user using object spread
+        const updateUser = await userModel.findByIdAndUpdate(
+            req.userId,
+            { $set: validatedBody },
+            { new: true }
+        );
+
+        return res.json(new response(updateUser, responseMessage.PROFILE_UPDATED));
+    } catch (error) {
+        console.error("Error during profile update:", error);
+        return next(error);
     }
+}
+
 
     /**
      * @swagger
