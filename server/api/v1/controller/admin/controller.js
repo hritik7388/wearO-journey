@@ -27,7 +27,7 @@ const {
     findCount,
 } = userServices;
 
-export class adminController {
+export class AdminController {
     /**
      * @swagger
      * /admin/dashboard:
@@ -104,58 +104,72 @@ export class adminController {
      *       200:
      *         description: Returns success message
      */
-    async login(req, res, next) {
-        var validationSchema = {
-            email: Joi.string().required(),
-            password: Joi.string().optional(),
+     async login(req, res, next) {
+        const validationSchema = Joi.object({
+            email: Joi.string().email().required(),
+            password: Joi.string().required(),
             deviceToken: Joi.string().allow("").optional(),
             deviceType: Joi.string().allow("").optional(),
-        };
+        });
+
         try {
-            let results;
-            var validatedBody = await Joi.validate(req.body, validationSchema);
-            const {email, password, deviceToken, deviceType} = validatedBody;
-            let userResult = await userModel.findOne({
-                email: email,
+            // Validate request body
+            const validatedBody = await validationSchema.validateAsync(req.body);
+
+            const { email, password, deviceToken = "", deviceType = "" } = validatedBody;
+
+            // Find user
+            const userResult = await userModel.findOne({
+                email,
                 userType: userType.ADMIN,
-                status: {$ne: status.DELETE},
+                status: { $ne: status.DELETE },
             });
-            console.log("userResult=================>>>>>", userResult);
+
             if (!userResult) {
                 throw apiError.notFound(responseMessage.USER_NOT_FOUND);
             }
-            if (!bcrypt.compareSync(password, userResult.password)) {
+
+            // Compare password (async)
+            const passwordMatch = await bcrypt.compare(password, userResult.password);
+            if (!passwordMatch) {
                 throw apiError.conflict(responseMessage.PASSWORD_NOT_MATCH);
-            } else {
-                var token = await commonFunction.getToken({
-                    _id: userResult._id,
-                    email: userResult.email,
-                    userType: userResult.userType,
-                    status: userResult.status,
-                    deviceToken: deviceToken,
-                    deviceType: deviceType,
-                });
-                results = {
-                    _id: userResult._id,
-                    email: email,
-                    speakeasy: userResult.speakeasy,
-                    userType: userResult.userType,
-                    token: token,
-                };
-                const notifi = await commonFunction.pushNotificationDelhi(
-                    validatedBody.deviceToken,
-                    validatedBody.deviceType,
+            }
+
+            // Generate token
+            const token = await commonFunction.getToken({
+                _id: userResult._id,
+                email: userResult.email,
+                userType: userResult.userType,
+                status: userResult.status,
+                deviceToken,
+                deviceType,
+            });
+
+            const results = {
+                _id: userResult._id,
+                email: userResult.email,
+                speakeasy: userResult.speakeasy,
+                userType: userResult.userType,
+                token,
+            };
+
+            // Push notification only if deviceToken is provided
+            if (deviceToken) {
+                await commonFunction.pushNotificationDelhi(
+                    deviceToken,
+                    deviceType,
                     `🎉 Welcome back, ${userResult.name}!`,
                     `Hi ${userResult.name}, you have successfully signed in to your wearO Journey account. 🚀`
                 );
-                console.log("notifi=================>>>>>", notifi);
             }
-            return res.json(new response(results, responseMessage.LOGIN));
+
+            return res.json(new Response(results, responseMessage.LOGIN));
         } catch (error) {
-            console.log(error);
+            console.error(error);
             return next(error);
         }
     }
+
 
     /**
      * @swagger
