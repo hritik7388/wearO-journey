@@ -9,7 +9,7 @@ import wareHouseModel from "../../../../models/wareHouseModel";
 import inventoryModel from "../../../../models/invetoryModel";
 import responseMessage from "../../../../../assets/responseMessage";
 
-export class inventoryController {
+export class InventoryController {
     /**
      * @swagger
      * /inventory/createInventory:
@@ -195,4 +195,4 @@ export class inventoryController {
     }
 }
 
-export default new inventoryController();
+export default new InventoryController();
