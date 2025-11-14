@@ -641,42 +641,50 @@ async forgotPassword(req, res, next) {
      *       200:
      *         description: Returns success message
      */
-    async resendOTP(req, res, next) {
-        var validationSchema = {
-            email: Joi.string().required(),
-        };
-        try {
-            if (req.body.field) {
-                req.body.field = req.body.field.toLowerCase();
-            }
-            var validatedBody = await Joi.validate(req.body, validationSchema);
-            const {email} = validatedBody;
-            var userResult = await userModel.findOne({
-                email: validatedBody.email,
-                status: {$ne: status.DELETE},
-                userType: userType.ADMIN,
-            });
-            if (!userResult) {
-                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
-            }
-            var otp = commonFunction.getOTP();
-            var otpTime = new Date().getTime() + 180000;
-            //   await commonFunction.sendMailOtpForgetAndResend(
-            //     "info@rival.finance",
-            //     otp
-            //   );
-            // await commonFunction.sendMailOtpForgetAndResend(email, otp);
-            var updateResult = await userModel.findByIdAndUpdate(
-                {_id: userResult._id},
-                {otp: otp, otpTime: otpTime},
-                {new: true}
-            );
-            return res.json(new response(updateResult, responseMessage.OTP_SEND));
-        } catch (error) {
-            console.log(error);
-            return next(error);
+  async resendOTP(req, res, next) {
+    const validationSchema = Joi.object({
+        email: Joi.string().email().required(),
+    });
+
+    try {
+        // Normalize email if provided
+        if (req.body.email) {
+            req.body.email = req.body.email.toLowerCase();
         }
+
+        const validatedBody = await validationSchema.validateAsync(req.body);
+        const { email } = validatedBody;
+
+        const userResult = await userModel.findOne({
+            email,
+            status: { $ne: status.DELETE },
+            userType: userType.ADMIN,
+        });
+
+        if (!userResult) {
+            throw apiError.notFound(responseMessage.USER_NOT_FOUND);
+        }
+
+        // Generate secure OTP
+        const otp = commonFunction.getOTP(); // ensure this uses crypto.randomInt
+        const otpExpTime = Date.now() + 3 * 60 * 1000; // 3 minutes from now
+
+        // Optionally send OTP via email
+        // await commonFunction.sendMailOtpForgetAndResend(email, otp);
+
+        const updateResult = await userModel.findByIdAndUpdate(
+            userResult._id,
+            { otp, otpExpTime, otpVerification: false },
+            { new: true }
+        );
+
+        return res.json(new response(updateResult, responseMessage.OTP_SEND));
+    } catch (error) {
+        console.error("Error during resendOTP:", error);
+        return next(error);
     }
+}
+
 
     /**
      * @swagger
