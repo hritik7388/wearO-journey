@@ -1,8 +1,7 @@
-const Joi = require("joi");
+import Joi from "joi";
 import status from "../../../../enum/status";
 import userType from "../../../../enum/userType";
 import apiError from "../../../../helper/apiError";
-import commonFunction from "../../../../helper/util";
 import response from "../../../../../assets/response";
 import userModel from "../../../../models/userModel";
 import productModel from "../../../../models/productModel";
@@ -83,8 +82,8 @@ export class inventoryController {
      *         description: Internal server error
      */
 
-    async createInventory(req, res, next) {
-        const validationSchema = {
+   async createInventory(req, res, next) {
+        const validationSchema = Joi.object({
             productId: Joi.string().required(),
             warehouseId: Joi.string().required(),
             colors: Joi.array().items(Joi.string()).min(1).required(),
@@ -96,45 +95,35 @@ export class inventoryController {
             stockInTransit: Joi.number().optional(),
             status: Joi.string().valid("ACTIVE", "INACTIVE", "OUT_OF_STOCK").optional(),
             images: Joi.array().items(Joi.string()).optional(),
-        };
+        });
 
         try {
-            const validatedBody = await Joi.validate(req.body, validationSchema);
+            const validatedBody = await validationSchema.validateAsync(req.body);
+            const { productId, warehouseId, colors, sizes, brand, stockAvailable = 0, stockReserved = 0, stockDamaged = 0, stockInTransit = 0, status: inventoryStatus = "ACTIVE", images = [] } = validatedBody;
 
-            // Check user
-            const userData = await userModel.findOne({
+            // Check admin user
+            const adminUser = await userModel.findOne({
                 _id: req.userId,
                 status: { $ne: status.DELETE },
                 userType: userType.ADMIN,
             });
-            if (!userData) {
-                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
-            }
+            if (!adminUser) throw apiError.notFound(responseMessage.USER_NOT_FOUND);
 
-            // Check if inventory already exists for this product and warehouse
-            const existingData = await inventoryModel.findOne({
-                productId: validatedBody.productId,
-                warehouseId: validatedBody.warehouseId,
-            });
-            if (existingData) {
+            // Check existing inventory
+            const existingInventory = await inventoryModel.findOne({ productId, warehouseId });
+            if (existingInventory) {
                 return res.status(400).json({
                     responseCode: 400,
                     responseMessage: "Inventory already exists for this product and warehouse.",
                 });
             }
 
-            // Fetch product data
-            const productData = await productModel.findOne({
-                _id: validatedBody.productId,
-                status: status.ACTIVE,
-            });
-            if (!productData) {
-                throw apiError.notFound(responseMessage.PRODUCT_NOT_FOUND);
-            }
+            // Fetch product
+            const productData = await productModel.findOne({ _id: productId, status: status.ACTIVE });
+            if (!productData) throw apiError.notFound(responseMessage.PRODUCT_NOT_FOUND);
 
-            // Check stockAvailable does not exceed product stock
+            // Stock validation
             const productStock = productData.stock || 0;
-            const stockAvailable = validatedBody.stockAvailable || 0;
             if (stockAvailable > productStock) {
                 return res.status(400).json({
                     responseCode: 400,
@@ -142,47 +131,32 @@ export class inventoryController {
                 });
             }
 
-            // Strict check: inventory colors must exactly match product colors
-            const productColors = productData.colors || [];
-            const productColorsSet = new Set(productColors);
-            const inventoryColorsSet = new Set(validatedBody.colors);
-
-            if (
-                productColorsSet.size !== inventoryColorsSet.size ||
-                [...productColorsSet].some(color => !inventoryColorsSet.has(color))
-            ) {
+            // Strict colors validation
+            const productColorsSet = new Set(productData.colors || []);
+            const inventoryColorsSet = new Set(colors);
+            if (productColorsSet.size !== inventoryColorsSet.size || [...productColorsSet].some(c => !inventoryColorsSet.has(c))) {
                 return res.status(400).json({
                     responseCode: 400,
-                    responseMessage: `Inventory colors must exactly match product colors: ${productColors.join(", ")}`,
+                    responseMessage: `Inventory colors must exactly match product colors: ${(productData.colors || []).join(", ")}`,
                 });
             }
 
-            // Strict check: inventory sizes must exactly match product sizes
-            const productSizes = productData.sizes || [];
-            const productSizesSet = new Set(productSizes);
-            const inventorySizesSet = new Set(validatedBody.sizes);
-
-            if (
-                productSizesSet.size !== inventorySizesSet.size ||
-                [...productSizesSet].some(size => !inventorySizesSet.has(size))
-            ) {
+            // Strict sizes validation
+            const productSizesSet = new Set(productData.sizes || []);
+            const inventorySizesSet = new Set(sizes);
+            if (productSizesSet.size !== inventorySizesSet.size || [...productSizesSet].some(s => !inventorySizesSet.has(s))) {
                 return res.status(400).json({
                     responseCode: 400,
-                    responseMessage: `Inventory sizes must exactly match product sizes: ${productSizes.join(", ")}`,
+                    responseMessage: `Inventory sizes must exactly match product sizes: ${(productData.sizes || []).join(", ")}`,
                 });
             }
 
-            // Fetch warehouse data
-            const warehouseData = await wareHouseModel.findOne({
-                _id: validatedBody.warehouseId,
-                status: { $ne: status.DELETE },
-            });
-            if (!warehouseData) {
-                throw apiError.notFound(responseMessage.WAREHOUSE_NOT_FOUND);
-            }
+            // Fetch warehouse
+            const warehouseData = await wareHouseModel.findOne({ _id: warehouseId, status: { $ne: status.DELETE } });
+            if (!warehouseData) throw apiError.notFound(responseMessage.WAREHOUSE_NOT_FOUND);
 
-            // Check warehouse totalStock can cover stockAvailable
-            let updatedTotalStock = (warehouseData.totalStock || 0) - stockAvailable;
+            // Check warehouse stock
+            const updatedTotalStock = (warehouseData.totalStock || 0) - stockAvailable;
             if (updatedTotalStock < 0) {
                 return res.status(400).json({
                     responseCode: 400,
@@ -190,26 +164,23 @@ export class inventoryController {
                 });
             }
 
-            // Update product stock after allocation
-            const updatedProductStock = productStock - stockAvailable;
-            await productModel.findByIdAndUpdate(validatedBody.productId, { stock: updatedProductStock }, { new: true });
+            // Update product and warehouse stock
+            await productModel.findByIdAndUpdate(productId, { stock: productStock - stockAvailable }, { new: true });
+            await wareHouseModel.findByIdAndUpdate(warehouseId, { totalStock: updatedTotalStock }, { new: true });
 
-            // Update warehouse total stock
-            await wareHouseModel.findByIdAndUpdate(validatedBody.warehouseId, { totalStock: updatedTotalStock }, { new: true });
-
-            // Create new inventory record
+            // Create inventory
             const inventoryData = await inventoryModel.create({
-                productId: validatedBody.productId,
-                warehouseId: validatedBody.warehouseId,
-                colors: validatedBody.colors,
-                sizes: validatedBody.sizes,
-                brand: validatedBody.brand,
-                stockAvailable: stockAvailable,
-                stockReserved: validatedBody.stockReserved || 0,
-                stockDamaged: validatedBody.stockDamaged || 0,
-                stockInTransit: validatedBody.stockInTransit || 0,
-                status: validatedBody.status || "ACTIVE",
-                images: validatedBody.images || [],
+                productId,
+                warehouseId,
+                colors,
+                sizes,
+                brand,
+                stockAvailable,
+                stockReserved,
+                stockDamaged,
+                stockInTransit,
+                status: inventoryStatus,
+                images,
             });
 
             return res.status(200).json({
@@ -223,4 +194,5 @@ export class inventoryController {
         }
     }
 }
+
 export default new inventoryController();
