@@ -1,21 +1,18 @@
-const Joi = require("joi");
+import Joi from "joi";
 import status from "../../../../enum/status";
 import userType from "../../../../enum/userType";
 import apiError from "../../../../helper/apiError";
-import commonFunction from "../../../../helper/util";
 import response from "../../../../../assets/response";
 import userModel from "../../../../models/userModel";
-import productModel from "../../../../models/productModel";
 import wareHouseModel from "../../../../models/wareHouseModel";
 import inventoryModel from "../../../../models/invetoryModel";
-import responseMessage from "../../../../../assets/responseMessage";
 import cartModel from "../../../../models/cartModel";
 import orderModel from "../../../../models/orderModel";
 import paymentModel from "../../../../models/paymentModel";
 import orderStatus from "../../../../enum/orderStatus";
-import {items} from "joi/lib/types/array";
-const Razorpay = require("razorpay");
-const crypto = require("crypto");
+import responseMessage from "../../../../../assets/responseMessage";
+import { default as Razorpay } from "razorpay";
+import crypto from "node:crypto";
 
 const razorpay = new Razorpay({
     key_id: "rzp_test_XOIXzlbvgcWlzr",
@@ -85,90 +82,94 @@ export class OrderController {
      */
 
     async createorder(req, res, next) {
-        const validationSchema = {
+        const validationSchema = Joi.object({
             cartId: Joi.string().required(),
             itemId: Joi.string().allow(null, "").optional(),
             paymentMode: Joi.string().valid("COD", "ONLINE").required(),
-        };
-        try {
-            const validatedBody = await Joi.validate(req.body, validationSchema);
-            const {
-                cartId,
-                itemId,
+        });
 
-                paymentMode,
-            } = validatedBody;
+        try {
+            const validatedBody = await validationSchema.validateAsync(req.body);
+            const { cartId, itemId, paymentMode } = validatedBody;
+
             const userdata = await userModel.findOne({
                 _id: req.userId,
-                status: {$ne: status.DELETE},
+                status: { $ne: status.DELETE },
                 userType: userType.USER,
             });
             if (!userdata) return next(apiError.notFound(responseMessage.USER_NOT_FOUND));
 
-            const cartData = await cartModel.findOne({_id: cartId, status: {$ne: status.DELETE}});
+            const cartData = await cartModel.findOne({ _id: cartId, status: { $ne: status.DELETE } });
             if (!cartData) return next(apiError.notFound(responseMessage.CART_NOT_FOUND));
 
             const inventoryData = await inventoryModel.findOne({
                 _id: cartData.items[0].inventoryId,
                 status: status.ACTIVE,
             });
+            if (!inventoryData) return next(apiError.notFound(responseMessage.CART_NOT_FOUND));
 
-            if (!inventoryData) {
-                return next(apiError.notFound(responseMessage.CART_NOT_FOUND));
-            }
             const wareHouseData = await wareHouseModel.find({
                 _id: inventoryData.warehouseId,
                 status: status.ACTIVE,
             });
-            if (!wareHouseData.length) {
-                return next(apiError.notFound(responseMessage.PRODUCT_NOT_FOUND));
-            }
+            if (!wareHouseData.length) return next(apiError.notFound(responseMessage.PRODUCT_NOT_FOUND));
 
-            const warehousesArray = wareHouseData.map((w) => ({
+            const warehousesArray = wareHouseData.map(w => ({
                 _id: w._id,
                 lat: w.address.location.coordinates[1],
                 lon: w.address.location.coordinates[0],
                 name: w.warehouseName,
             }));
+
             const userLocation = {
-                lat: userdata.location.coordinates[1], // latitude
-                lon: userdata.location.coordinates[0], // longitude
+                lat: userdata.location?.coordinates[1],
+                lon: userdata.location?.coordinates[0],
                 address: userdata.address || "",
             };
+
             if (userLocation.lat === undefined || userLocation.lon === undefined) {
                 return next(apiError.badRequest("User location coordinates are missing"));
             }
+
             const shippingpayment = commonFunction.getNearestWarehouseAndShippingCost(userLocation, warehousesArray);
+
             let itemsToOrder = [];
             if (itemId) {
-                const item = cartData.items.find((i) => i._id.toString() === itemId);
+                const item = cartData.items.find(i => i._id.toString() === itemId);
                 if (!item) return next(apiError.notFound("Item not found in cart"));
                 itemsToOrder.push(item);
             } else {
                 itemsToOrder = cartData.items;
             }
+
             if (itemsToOrder.length === 0) return next(apiError.badRequest("No items found to order"));
-            let subtotal;
+
+            let subtotal = 0;
             let totalDiscount = 0;
             let totalShipping = 0;
+
             if (itemId) {
-                subtotal = itemsToOrder[0].totalAmount;
+                const item = itemsToOrder[0];
+                subtotal = item.totalAmount;
                 totalDiscount += item.discount || 0;
                 totalShipping += item.shippingCharges || 0;
             } else {
-                subtotal = cartData.subtotal;
-                cartData.items.forEach((item) => {
+                for (const item of cartData.items) {
                     totalDiscount += item.discount || 0;
                     totalShipping += item.shippingCharges || 0;
-                });
+                }
+                subtotal = cartData.subtotal;
             }
+
             totalShipping += shippingpayment.shippingCost;
             const finalSubtotal = subtotal + totalShipping - totalDiscount;
+
             const TXN = await commonFunction.generateTXNNumber();
+
             const createOrders = await orderModel.create({
                 userId: userdata._id,
                 cartId: cartData._id,
-                items: itemsToOrder.map((item) => ({
+                items: itemsToOrder.map(item => ({
                     productId: item.productId,
                     inventoryId: item.inventoryId,
                     productName: item.productName,
@@ -184,7 +185,7 @@ export class OrderController {
                 discount: totalDiscount,
                 paymentStatus: "PENDING",
                 paymentMode,
-                orderStatus: "PROCESSING",
+                orderStatus: orderStatus.PROCESSING,
                 trackingId: TXN,
                 deliveryAddress: {
                     postalCode: userdata.zipCode,
@@ -199,10 +200,11 @@ export class OrderController {
 
             return res.json(new response(createOrders, responseMessage.ORDER_CREATED));
         } catch (error) {
+            console.error("Error in createorder:", error);
             return next(error);
         }
     }
-
+}
     /**
      * @swagger
      * /order/checkout:
@@ -546,21 +548,4 @@ export class OrderController {
     }
 }
 export default new OrderController();
-
-// Restore stock for the removed quantity
-// await inventoryModel.findByIdAndUpdate(item.inventoryId, {
-//     $inc: { stockAvailable: oldQuantity }
-// });
-
-// Remove the item from cart
-
-// const diff = quantity - oldQuantity;
-
-// quantity > 0, normal update flow
-// if (diff > 0 && inventory.stockAvailable < diff) {
-//     throw apiError.badRequest(responseMessage.OUT_OF_STOCK);
-// }
-
-// await inventoryModel.findByIdAndUpdate(item.inventoryId, {
-//     $inc: { stockAvailable: -diff }
-// });
+ 
