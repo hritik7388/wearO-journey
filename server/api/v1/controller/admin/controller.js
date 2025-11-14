@@ -817,34 +817,42 @@ async forgotPassword(req, res, next) {
      *       200:
      *         description: Returns success message
      */
-    async viewUser(req, res, next) {
-        const validationSchema = {
-            _id: Joi.string().required(),
-        };
-        try {
-            const validatedBody = await Joi.validate(req.query, validationSchema);
-            let userResult = await findUser({
-                _id: req.userId,
-                status: {$ne: status.DELETE},
-                userType: userType.ADMIN,
-            });
-            if (!userResult) {
-                throw apiError.notFound(responseMessage.USER_NOT_FOUND);
-            }
-            var userInfo = await findUser({
-                _id: validatedBody._id,
-                status: {$ne: status.DELETE},
-            });
-            console.log("userInfo==>>>>", userInfo);
-            if (!userInfo) {
-                throw apiError.notFound(responseMessage.DATA_NOT_FOUND);
-            }
-            return res.json(new response(userInfo, responseMessage.DATA_FOUND));
-        } catch (error) {
-            console.log("btcBal.balance==>>", error);
-            return next(error);
+   async viewUser(req, res, next) {
+    const validationSchema = Joi.object({
+        _id: Joi.string().required(),
+    });
+
+    try {
+        const validatedBody = await validationSchema.validateAsync(req.query);
+
+        const userResult = await findUser({
+            _id: req.userId,
+            status: { $ne: status.DELETE },
+            userType: userType.ADMIN,
+        });
+
+        if (!userResult) {
+            throw apiError.notFound(responseMessage.USER_NOT_FOUND);
         }
+
+        const userInfo = await findUser({
+            _id: validatedBody._id,
+            status: { $ne: status.DELETE },
+        });
+
+        console.log("userInfo==>>>>", userInfo);
+
+        if (!userInfo) {
+            throw apiError.notFound(responseMessage.DATA_NOT_FOUND);
+        }
+
+        return res.json(new response(userInfo, responseMessage.DATA_FOUND));
+    } catch (error) {
+        console.error("Error in viewUser:", error);
+        return next(error);
     }
+}
+
 
     /**
      * @swagger
@@ -874,10 +882,10 @@ async forgotPassword(req, res, next) {
         };
         try {
             const validatedBody = await Joi.validate(req.query, validationSchema);
-            var {_id} = validatedBody;
+            const {_id} = validatedBody;
             console.log("validatedBody==>>", validatedBody);
 
-            let userResult = await findUser({
+            const userResult = await findUser({
                 _id: req.userId,
                 status: {$ne: status.DELETE},
                 userType: userType.ADMIN,
@@ -885,7 +893,7 @@ async forgotPassword(req, res, next) {
             if (!userResult) {
                 throw apiError.notFound(responseMessage.USER_NOT_FOUND);
             }
-            var userInfo = await findUser({
+            const userInfo = await findUser({
                 _id: validatedBody._id,
                 userType: userType.USER,
                 status: {$ne: status.DELETE},
@@ -893,7 +901,7 @@ async forgotPassword(req, res, next) {
             if (!userInfo) {
                 throw apiError.notFound(responseMessage.DATA_NOT_FOUND);
             }
-            let deleteRes = await userModel.findByIdAndUpdate(
+            const deleteRes = await userModel.findByIdAndUpdate(
                 {_id: userInfo._id},
                 {$set: {status: status.DELETE}},
                 {new: true}
@@ -934,7 +942,7 @@ async forgotPassword(req, res, next) {
         };
         try {
             const validatedBody = await Joi.validate(req.query, validationSchema);
-            let userResult = await findUser({
+            const userResult = await findUser({
                 _id: req.userId,
                 status: {$ne: status.DELETE},
                 userType: userType.ADMIN,
@@ -942,7 +950,7 @@ async forgotPassword(req, res, next) {
             if (!userResult) {
                 throw apiError.notFound(responseMessage.USER_NOT_FOUND);
             }
-            var userInfo = await findUser({
+            const userInfo = await findUser({
                 _id: validatedBody._id,
                 userType: {$ne: "ADMIN"},
                 //status: { $ne: status.DELETE },
@@ -951,10 +959,10 @@ async forgotPassword(req, res, next) {
                 throw apiError.notFound(responseMessage.DATA_NOT_FOUND);
             }
             if (userInfo.status == status.ACTIVE) {
-                let blockRes = await updateUser({_id: userInfo._id}, {status: status.BLOCK});
+                const blockRes = await updateUser({_id: userInfo._id}, {status: status.BLOCK});
                 return res.json(new response(blockRes, responseMessage.BLOCK_BY_ADMIN));
             } else {
-                let activeRes = await updateUser({_id: userInfo._id}, {status: status.ACTIVE});
+                const activeRes = await updateUser({_id: userInfo._id}, {status: status.ACTIVE});
                 return res.json(new response(activeRes, responseMessage.UNBLOCK_BY_ADMIN));
             }
         } catch (error) {
@@ -1022,7 +1030,7 @@ async forgotPassword(req, res, next) {
         };
         try {
             const validatedBody = await Joi.validate(req.query, validationSchema);
-            let userResult = await findUser({
+            const userResult = await findUser({
                 _id: req.userId,
                 status: {$ne: status.DELETE},
                 userType: userType.ADMIN,
@@ -1031,7 +1039,7 @@ async forgotPassword(req, res, next) {
                 throw apiError.notFound(responseMessage.USER_NOT_FOUND);
             }
 
-            let dataResults = await paginateSearch(validatedBody);
+            const dataResults = await paginateSearch(validatedBody);
             if (dataResults.docs.length == 0) {
                 throw apiError.notFound(responseMessage.USER_NOT_FOUND);
             }
